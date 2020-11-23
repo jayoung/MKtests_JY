@@ -31,61 +31,37 @@ test1_results <- doMKtest(test1_file, pop1seqs=test1_popNames[["pop1"]],
                           writeAncFasta=TRUE, writeMKoutput=TRUE,
                           flagRareAlleles=TRUE, alleleFreqThreshold=0.2)
 
+
+test1_results_freqFilter_20pc <- doMKtest(test1_file, pop1seqs=test1_popNames[["pop1"]],
+                          pop2seqs=test1_popNames[["pop2"]],
+                          writeAncFasta=TRUE, writeMKoutput=TRUE,
+                          flagRareAlleles=TRUE, filterRareAlleles=TRUE,
+                          alleleFreqThreshold=0.2)
+
 #test1_results[["summary"]]
 #head(test1_results[["positions"]])
 
-
+### test2 
 test2_file <- "test_data/test_rareVariants/test2/test2.fa"
 test2_aln <- readBStringSet(test2_file)
 test2_popNames <- list()
 test2_popNames[["pop1"]] <- grep ("pop1", names(test2_aln), value=TRUE)
 test2_popNames[["pop2"]] <- grep ("pop2", names(test2_aln), value=TRUE)
 
-test2_results <- doMKtest(test2_file, pop1seqs=test2_popNames[["pop1"]],
+test2_results_noFreqFilter <- doMKtest(test2_file, pop1seqs=test2_popNames[["pop1"]],
+                          pop2seqs=test2_popNames[["pop2"]],
+                          writeAncFasta=TRUE, writeMKoutput=TRUE,
+                          flagRareAlleles=TRUE, 
+                          alleleFreqThreshold=0.2)
+
+test2_results_freqFilter_20pc <- doMKtest(test2_file, pop1seqs=test2_popNames[["pop1"]],
                           pop2seqs=test2_popNames[["pop2"]],
                           writeAncFasta=TRUE, writeMKoutput=TRUE,
                           flagRareAlleles=TRUE, filterRareAlleles=TRUE,
                           alleleFreqThreshold=0.2)
 
-#test2_results[["summary"]]
-#head(test2_results[["positions"]])
 
-filter_aln <- function(myAln, alleleFreqThreshold=0) {
-    myAln_df <- as.data.frame(as.matrix(myAln), stringsAsFactors=FALSE)
-    # frequencies (over all non-N bases)
-    myAln_freqs <- getACGTfreqs(tabulateDF(myAln_df))
-    # which positions are polymorphic?
-    polymorphicPositions <- which(apply(myAln_freqs, 2, function(x) {
-        sum(x>0) > 1
-    }))
-    # go through those, and if any alleles have freq under threshold, modify the alignment
-    positionsModified <- 0
-    allelesModified <- 0
-    for (i in polymorphicPositions) {
-        freqs <- myAln_freqs[,i]
-        nonZeroFreqs <- freqs[which(freqs>0)]
-        # if there are no rare alleles, we don't need to do anything
-        if (sum(nonZeroFreqs<alleleFreqThreshold) == 0) {next}
-        # but if there are, we replace those in the alignment with the major allele (and if there is a tie between major alleles we choose arbitrarily)
-        positionsModified <- positionsModified + 1
-        majorAllele <- rownames(myAln_freqs)[ which.max(freqs)]
-        rareAlleles <- rownames(myAln_freqs)[ (freqs>0 & freqs<alleleFreqThreshold)]
-        for (rareAllele in rareAlleles) {
-            myAln_df[,i] <- gsub(rareAllele,majorAllele,myAln_df[,i])
-            allelesModified <- allelesModified + 1
-        }
-    }
-    cat("modified",allelesModified,"alleles at",positionsModified,"positions\n")
-    # turn the data.frame back into a BStringSet
-    aln_filt <- BStringSet(apply(myAln_df, 1, function(y) {
-        BString(paste(y, collapse=""))
-    }))
-    return(aln_filt)
-}
-test2_aln_filt <- filter_aln(test2_aln[1:10], alleleFreqThreshold=0.2)
-
-tabulateDF(test2_aln)
-
+### test3 (three alignments)
 test3_dir <- "test_data/test_rareVariants/test3"
 test3_files <- list.files(test3_dir, pattern=".fa$", full.names=TRUE)
 names(test3_files) <- gsub(paste(test3_dir,"/",sep=""),"",test3_files)
@@ -102,10 +78,20 @@ test3_popNames <- lapply(test3_alns, function(x){
 
 test3_results <- lapply(names(test3_files), function(x){
     doMKtest(test3_files[[x]], pop1seqs=test3_popNames[[x]][["pop1"]],
-                              pop2seqs=test3_popNames[[x]][["pop2"]],
-                              writeAncFasta=TRUE, writeMKoutput=TRUE,
-                              flagRareAlleles=TRUE, alleleFreqThreshold=0.2)
+             pop2seqs=test3_popNames[[x]][["pop2"]],
+             writeAncFasta=TRUE, writeMKoutput=TRUE,
+             flagRareAlleles=TRUE, filterRareAlleles=TRUE, 
+             alleleFreqThreshold=0.2)
 })
+
+
+
+## combine results from all Arps alignments
+test3_results_all <- combineMKresults(test3_results, 
+                                       outFile="test3_results_freqFilter_20pc.xlsx",
+                                       outDir=test3_dir,
+                                       getGeneNames=FALSE)
+
 
 
 #test3_results[["summary"]]
