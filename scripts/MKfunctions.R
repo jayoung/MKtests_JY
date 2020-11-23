@@ -818,14 +818,14 @@ getMinorMajorAlleles <- function(df, flagRareAlleles=FALSE, alleleFreqThreshold=
 #                     flagRareAlleles=FALSE, alleleFreqThreshold=0
 # flagRareAlleles: for now this only FLAGS rare polymorphisms - later I want to actually deal with them
 # alleleFreqThreshold: used by flagRareAlleles
-
+# writeAncFasta and writeMKoutput - will I write output files for each individual alignment, or will I wait until I combine output from several aligments (=default) 
 doMKtest <- function(myAlnFile, outDir=NULL,
                      pop1seqs=NULL, pop2seqs=NULL, 
                      pop1alias=NULL, pop2alias=NULL,
                      polarize=FALSE, outgroupSeqs=NULL,
                      combiningApproach="conservative", 
                      flagRareAlleles=FALSE, alleleFreqThreshold=0,
-                     writeAncFasta=FALSE) {
+                     writeAncFasta=FALSE, writeMKoutput=FALSE) {
     
     require(openxlsx)
     ### some checks
