@@ -628,6 +628,8 @@ alpha <- function(Dn,Ds,Pn,Ps) {
 # tests significance
 testMKresult <- function(pVal, NI, pVal_threshold) {
     result <- "not signif"
+    if(is.na(pVal)) {return(NA)}
+    if(is.na(pVal)) {return(NA)}
     if (pVal<=pVal_threshold & NI>1) { result <- "negative selection" }
     if (pVal<=pVal_threshold & NI<1) { result <- "positive selection" }
     return(result)
@@ -751,23 +753,31 @@ getAncForFasta <- function(myanc) {
 }
 
 ## getMinorMajorAlleles - from a table of allele freqs (only ACGT) report major allele(s) and minor allele(s) and their frequencies. If there is an exact tie there can be >1 major allele
-
-getMinorMajorAlleles <- function(df, flagRareAlleles=FALSE, alleleFreqThreshold=0) {
+getMinorMajorAlleles <- function(df, 
+                                 flagRareAlleles=FALSE, 
+                                 alleleFreqThreshold=0) {
     bases <- rownames(df)
+    # look at each column of the data.frame, i.e. each alignment position
     output <- apply(df, 2, function(x) {
+        #cat("position",x,"\n")
         majorAlleles <- bases[ which(x==max(x)) ]
         major_allele_freqs <- x[majorAlleles]
         presentAlleles <- bases[ which(x>0) ]
         minorAlleles <- setdiff(presentAlleles, majorAlleles)
-        if(length(minorAlleles)==0) { 
+        # initialize rareAlleles - will populate it later
+        rareAlleles <- c()
+        if(length(minorAlleles)==0) { # there was no polymorphism
             minorAlleles <- NA
             minor_allele_freqs <- NA
             if (flagRareAlleles) {minorAlleleFlags <- NA}
-        } else {
+        } else { # there is polymorphism
             minor_allele_freqs <- x[minorAlleles]
             if (flagRareAlleles) {
                 minorAlleleFlags <- rep("common", length(minor_allele_freqs))
-                minorAlleleFlags[which(minor_allele_freqs <= alleleFreqThreshold)] <- "rare"
+                rareAlleleTest <- which(minor_allele_freqs < alleleFreqThreshold)
+                if(length(rareAlleleTest)>0) {
+                    minorAlleleFlags[rareAlleleTest] <- "rare"
+                }
             }
             # round AFTER testing frequency threshold
             minor_allele_freqs <- round(minor_allele_freqs,3)
@@ -784,27 +794,64 @@ getMinorMajorAlleles <- function(df, flagRareAlleles=FALSE, alleleFreqThreshold=
             majorAlleles <- "-"
             major_allele_freqs <- 1
         }
-        eachColumnOutput <- list(major=majorAlleles, minor=minorAlleles, 
-                majorFreqs=major_allele_freqs, minorFreqs=minor_allele_freqs)
+        eachColumnOutput <- list(major=majorAlleles, 
+                                 minor=minorAlleles, 
+                                 majorFreqs=major_allele_freqs, 
+                                 minorFreqs=minor_allele_freqs)
         if (flagRareAlleles) {
             eachColumnOutput[["minorAlleleFlags"]] <- minorAlleleFlags
         }
         return(eachColumnOutput)
     })
-    # return(output) ## xx temp
-    ## output for now may be ugly. perhaps deal with it later
+    ## turn it into a table 
     output_table <- data.frame(major_allele=sapply(output, "[[", "major"),
                          minor_alleles=sapply(output, "[[", "minor"), 
                          major_allele_freqs=sapply(output, "[[", "majorFreqs"),
-                         minor_allele_freqs=sapply(output, "[[", "minorFreqs"))
+                         minor_allele_freqs=sapply(output, "[[", "minorFreqs")) 
     if (flagRareAlleles) {
-        output_table[,"rareFlags"] <- sapply(output, "[[", "minorAlleleFlags")
+        output_table[,"rare_flags"] <- sapply(output, "[[", "minorAlleleFlags")
     }
     return(output_table)
 }
 
 
-
+##### filterAlnRemoveRareVariants - takes an alignment (from a single population), and for any allele whose frequency is lower than the specified threshold, replaces that allele with the major allele 
+# (if there's a tie between major allele freqs we arbitrarily pick one)
+filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
+    if(alleleFreqThreshold==0) {
+        cat("\n\n    WARNING - you did not specify an allele frequency threshold, so we are not filtering out rare alleles\n\n")
+        return(myAln)
+    }
+    myAln_df <- as.data.frame(as.matrix(myAln), stringsAsFactors=FALSE)
+    # frequencies (over all non-N bases)
+    myAln_freqs <- getACGTfreqs(tabulateDF(myAln_df))
+    # which positions are polymorphic?
+    polymorphicPositions <- which(apply(myAln_freqs, 2, function(x) { sum(x>0) > 1 }))
+    # go through those, and if any alleles have freq under threshold, modify the alignment
+    positionsModified <- 0
+    allelesModified <- 0
+    for (i in polymorphicPositions) {
+        freqs <- myAln_freqs[,i]
+        nonZeroFreqs <- freqs[which(freqs>0)]
+        # if there are no rare alleles, we don't need to do anything
+        if (sum(nonZeroFreqs<alleleFreqThreshold) == 0) {next}
+        # but if there are, we replace those in the alignment with the major allele (and if there is a tie between major alleles we choose arbitrarily)
+        positionsModified <- positionsModified + 1
+        majorAllele <- rownames(myAln_freqs)[ which.max(freqs)[1]]
+        rareAlleles <- rownames(myAln_freqs)[ (freqs>0 & freqs<alleleFreqThreshold)]
+        for (rareAllele in rareAlleles) {
+            cat("removing allele",rareAllele,"at position",i,"\n")
+            myAln_df[,i] <- gsub(rareAllele,majorAllele,myAln_df[,i])
+            allelesModified <- allelesModified + 1
+        }
+    }
+    cat("    modified",allelesModified,"alleles at",positionsModified,"positions\n")
+    # turn the data.frame back into a BStringSet
+    aln_filt <- BStringSet(apply(myAln_df, 1, function(y) {
+        BString(paste(y, collapse=""))
+    }))
+    return(aln_filt)
+}
 
 ##### doMKtest is a standalone function, that runs the MK tests given a fasta alignment file and a bunch of options:
 # myAlnFile: a fasta file, in-frame alignment
@@ -816,7 +863,8 @@ getMinorMajorAlleles <- function(df, flagRareAlleles=FALSE, alleleFreqThreshold=
 #     "mean" (take mean ns and mean s over all possible combinations) or 
 #     "conservative" (take the count combination that minimizes ns)
 #                     flagRareAlleles=FALSE, alleleFreqThreshold=0
-# flagRareAlleles: for now this only FLAGS rare polymorphisms - later I want to actually deal with them
+# flagRareAlleles: flags rare polymorphisms with freq < alleleFreqThreshold, but does not change the MK counts
+# filterRareAlleles: remove rare alleles with freq < alleleFreqThreshold
 # alleleFreqThreshold: used by flagRareAlleles
 # writeAncFasta and writeMKoutput - will I write output files for each individual alignment, or will I wait until I combine output from several aligments (=default) 
 doMKtest <- function(myAlnFile, outDir=NULL,
@@ -824,7 +872,9 @@ doMKtest <- function(myAlnFile, outDir=NULL,
                      pop1alias=NULL, pop2alias=NULL,
                      polarize=FALSE, outgroupSeqs=NULL,
                      combiningApproach="conservative", 
-                     flagRareAlleles=FALSE, alleleFreqThreshold=0,
+                     flagRareAlleles=FALSE, 
+                     filterRareAlleles=FALSE, 
+                     alleleFreqThreshold=0,
                      writeAncFasta=FALSE, writeMKoutput=FALSE) {
     
     require(openxlsx)
@@ -982,14 +1032,34 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     
     # frequencies (over all non-N bases)
     aln_tables_freq <- lapply( aln_tables, getACGTfreqs )
-    
-    # get major and minor alleles and their frequencies, flag alleles below a certain frequency threshold
+
+    # for each population, get major and minor alleles and their frequencies, flag alleles below a certain frequency threshold (but I do filtering in a separate step, later)
     cat("    looking at allele frequencies\n")
-    aln_tables_majorMinor <- lapply(aln_tables_freq, getMinorMajorAlleles, flagRareAlleles=flagRareAlleles, alleleFreqThreshold=alleleFreqThreshold)
+    aln_tables_majorMinor <- lapply(aln_tables_freq, 
+                                    getMinorMajorAlleles, 
+                                    flagRareAlleles=flagRareAlleles, 
+                                    alleleFreqThreshold=alleleFreqThreshold)
+    
+    #return(aln_tables_majorMinor)
     cat("        done looking at allele frequencies\n")
    
     #### split alignment by sequence type
     aln_split <- split(aln, seqClassesInAlnOrder)
+    
+    #### for each of pop1 and pop2, we replace rare alleles with the major allele
+    if(filterRareAlleles) {
+        alns_filt <- lapply( c("pop1","pop2"), function(thisPop) {
+            filter_aln(aln_split[[thisPop]],alleleFreqThreshold=alleleFreqThreshold)
+        })
+        #return(alns_filt)
+        names(alns_filt) <- c("pop1","pop2")
+        aln_split <- as.list(aln_split)
+        ## wierd notation, see my Biostrings github issue https://github.com/Bioconductor/Biostrings/issues/39
+        aln_split[["pop1"]] <- alns_filt[["pop1"]]
+        aln_split[["pop2"]] <- alns_filt[["pop2"]]
+        #return(aln_split)
+        aln_split <- BStringSetList(aln_split)
+    }
     aln_split["pop1_and_pop2"] <- BStringSetList(c(aln_split[["pop1"]], aln_split[["pop2"]]))
     
     #### get each extant codon in each group

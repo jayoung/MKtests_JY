@@ -4,7 +4,7 @@
 
 ### set working directory
 # mac location
-setwd("~/Desktop/mac_workStuff/mac_MKtests/forGithub/")
+setwd("~/Desktop/mac_workStuff/mac_MKtests/MKtests_JY/")
 # fast location
 #setwd("/fh/fast/malik_h/user/jayoung/MKtest/forGithub/")
 
@@ -14,9 +14,102 @@ source("scripts/MKfunctions.R")
 ######## test using same alignment as MK website:
 MKresults_websiteExample <- doMKtest("test_data/MKTwebsiteExample/MKTwebsite_testAln.fa", 
           pop1seqs=c("pongo1","pongo2"), pop1alias="pongo",
-          pop2seqs=c("trachy1","trachy2"), pop2alias="trachy" )
+          pop2seqs=c("trachy1","trachy2"), pop2alias="trachy",
+          writeAncFasta=TRUE, writeMKoutput=TRUE)
 #temp[["summary"]]
 #head(temp[["positions"]])
+
+######## test some alignments I made to test rare variant filtering:
+test1_file <- "test_data/test_rareVariants/test1/test1.fa"
+test1_aln <- readBStringSet(test1_file)
+test1_popNames <- list()
+test1_popNames[["pop1"]] <- grep ("pop1", names(test1_aln), value=TRUE)
+test1_popNames[["pop2"]] <- grep ("pop2", names(test1_aln), value=TRUE)
+
+test1_results <- doMKtest(test1_file, pop1seqs=test1_popNames[["pop1"]],
+                          pop2seqs=test1_popNames[["pop2"]],
+                          writeAncFasta=TRUE, writeMKoutput=TRUE,
+                          flagRareAlleles=TRUE, alleleFreqThreshold=0.2)
+
+#test1_results[["summary"]]
+#head(test1_results[["positions"]])
+
+
+test2_file <- "test_data/test_rareVariants/test2/test2.fa"
+test2_aln <- readBStringSet(test2_file)
+test2_popNames <- list()
+test2_popNames[["pop1"]] <- grep ("pop1", names(test2_aln), value=TRUE)
+test2_popNames[["pop2"]] <- grep ("pop2", names(test2_aln), value=TRUE)
+
+test2_results <- doMKtest(test2_file, pop1seqs=test2_popNames[["pop1"]],
+                          pop2seqs=test2_popNames[["pop2"]],
+                          writeAncFasta=TRUE, writeMKoutput=TRUE,
+                          flagRareAlleles=TRUE, filterRareAlleles=TRUE,
+                          alleleFreqThreshold=0.2)
+
+#test2_results[["summary"]]
+#head(test2_results[["positions"]])
+
+filter_aln <- function(myAln, alleleFreqThreshold=0) {
+    myAln_df <- as.data.frame(as.matrix(myAln), stringsAsFactors=FALSE)
+    # frequencies (over all non-N bases)
+    myAln_freqs <- getACGTfreqs(tabulateDF(myAln_df))
+    # which positions are polymorphic?
+    polymorphicPositions <- which(apply(myAln_freqs, 2, function(x) {
+        sum(x>0) > 1
+    }))
+    # go through those, and if any alleles have freq under threshold, modify the alignment
+    positionsModified <- 0
+    allelesModified <- 0
+    for (i in polymorphicPositions) {
+        freqs <- myAln_freqs[,i]
+        nonZeroFreqs <- freqs[which(freqs>0)]
+        # if there are no rare alleles, we don't need to do anything
+        if (sum(nonZeroFreqs<alleleFreqThreshold) == 0) {next}
+        # but if there are, we replace those in the alignment with the major allele (and if there is a tie between major alleles we choose arbitrarily)
+        positionsModified <- positionsModified + 1
+        majorAllele <- rownames(myAln_freqs)[ which.max(freqs)]
+        rareAlleles <- rownames(myAln_freqs)[ (freqs>0 & freqs<alleleFreqThreshold)]
+        for (rareAllele in rareAlleles) {
+            myAln_df[,i] <- gsub(rareAllele,majorAllele,myAln_df[,i])
+            allelesModified <- allelesModified + 1
+        }
+    }
+    cat("modified",allelesModified,"alleles at",positionsModified,"positions\n")
+    # turn the data.frame back into a BStringSet
+    aln_filt <- BStringSet(apply(myAln_df, 1, function(y) {
+        BString(paste(y, collapse=""))
+    }))
+    return(aln_filt)
+}
+test2_aln_filt <- filter_aln(test2_aln[1:10], alleleFreqThreshold=0.2)
+
+tabulateDF(test2_aln)
+
+test3_dir <- "test_data/test_rareVariants/test3"
+test3_files <- list.files(test3_dir, pattern=".fa$", full.names=TRUE)
+names(test3_files) <- gsub(paste(test3_dir,"/",sep=""),"",test3_files)
+names(test3_files) <- gsub(".fa$","",names(test3_files))
+
+test3_alns <- lapply(test3_files, readBStringSet)
+
+test3_popNames <- lapply(test3_alns, function(x){
+    popNames <- list()
+    popNames[["pop1"]] <- grep ("pop1", names(x), value=TRUE)
+    popNames[["pop2"]] <- grep ("pop2", names(x), value=TRUE)
+    return(popNames)
+})
+
+test3_results <- lapply(names(test3_files), function(x){
+    doMKtest(test3_files[[x]], pop1seqs=test3_popNames[[x]][["pop1"]],
+                              pop2seqs=test3_popNames[[x]][["pop2"]],
+                              writeAncFasta=TRUE, writeMKoutput=TRUE,
+                              flagRareAlleles=TRUE, alleleFreqThreshold=0.2)
+})
+
+
+#test3_results[["summary"]]
+#head(test3_results[["positions"]])
 
 
 ######## run on three Arp53D alignments
@@ -326,10 +419,3 @@ Rini_results_polarized_all <- combineMKresults(MKresults_RiniAlignments_polarize
                         pop1alias="mel", pop2alias="sim")
 
 
-
-# xx to help troubleshooting, make a trim function, to consider only some portions of the alignment (and it might be useful in general)
-# xx in the individual tests, add option to suppress file output
-# xx add alternative input methods eg separate input files for each population (and outgroup) - that would allow a script
-# xx check it works on Rini data as before
-# xx check it works on Arp53D polarized and unpolarized like before
-# xx add methods tab to spreadsheet to capture parameters and warnings, perhaps also a tab to name the seqs used

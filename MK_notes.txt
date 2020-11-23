@@ -24,3 +24,8 @@ git commit
 git push
 
 
+# after adding something to .gitignore
+git rm --cached .DS_Store
+git add --all . 
+git commit
+git push
