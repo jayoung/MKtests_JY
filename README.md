@@ -3,19 +3,23 @@
 ## Janet Young Nov 2020
 
 # Overview
-R functions to perform McDonald-Kreitman tests
+My R functions to perform McDonald-Kreitman tests
 
 Can polarize changes if an outgroup is provided
 
 Can filter out low frequency variants (this sometimes results in increased fixed changes, which is counter-intuitive, but occurs when there are polymorphisms where the ancestral allele is at low frequency and the derived allele is the only one that remains after filtering)
 
+Reminder:  best practise is to use sequences from only a single population (e.g. ZI population of D. melanogaster) and to remove rare polymorphisms (e.g. remove alleles with frequency <= 5%)
+
 See https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test
+
+## An alternative: the MKT website
 
 I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output. 
 
-A note about the website: it ignores alignment positions where >=1 sequence contains a gap OR an N (e.g. demonstrate that using the two test alignments in MKTwebsite_testAln_addNseqs).  In contrast, my script includes those positions but does not count the gap or N as a change.  Only in the case where one of the populations has only gap or N at a position, then I cannot count any fixed changes in that position.
+A note about results from that website: it ignores alignment positions where >=1 sequence contains a gap OR an N (e.g. demonstrate that using the two test alignments in MKTwebsite_testAln_addNseqs).  In contrast, my script includes those positions but does not count the gap or N as a change.  Only in the case where one of the populations has only gap or N at a position, then I cannot count any fixed changes in that position.
 
-For particularly gappy alignments, this can be a problem. This is why we used Lisa's script to remove any seq containing Ns.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
+For particularly gappy alignments, this can be a problem. This is why we use Lisa's script to remove any seq containing Ns if we want to perform MK tests using the website.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
 ```
     NNNNNNACGTAGCTA
     ACGTNNNNNNNNNNN
@@ -36,58 +40,51 @@ is the example provided on http://mkt.uab.es/mkt/MKT.asp
 
 ## 2. test1.fa to test filtering polymorphisms based on frequency
 
-test_rareVariants/test1
+file: test_rareVariants/test1
 
-10 seqs from pop1
-1 seq from pop2
+contains 10 seqs from pop1, 1 seq from pop2
 
-1 fixed non-synon
-1 fixed synon
-1 pop1-poly synon with derived allele at 10%
-1 pop1-poly non-synon with derived allele at 30%
-    my script works
+contains these changes: 
+
+Dn=1, Ds=1, Pn=1 (derived allele at 30%), Ps=1 (derived allele at 10%)
+
+Use a 20% threshold to test filtering. Results should be:
+
+Dn=1, Ds=1, Pn=1, Ps=1   without frequency filter
+
+Dn=1, Ds=1, Pn=1, Ps=0   with 20% frequency filter
 
 
 ## 2. test2.fa to test filtering polymorphisms based on frequency - complex
 
-test_rareVariants/test2
+file: test_rareVariants/test2
 
-10 seqs from pop1
-1 seq from pop2
+contains 10 seqs from pop1, 1 seq from pop2
 
-1 fixed non-synon
-1 fixed synon
-1 pop1-poly non-synon with derived allele at 30%
-1 pop1-poly non-synon with ancestral allele at 30%
+contains these changes: 
 
-1 pop1-poly synon with derived allele at 10%
-1 pop1-poly synon with ancestral allele at 10%
+Dn=1, Ds=1, Pn=2 (derived alleles both at 30%), Ps=1 (derived alleles at 90% and 10%)
 
+The rare derived allele is ignored (Ps reduced by 1), and the rare ancestral allele gets counted as a fixed change (Ps reduced by 1, and Ds increased by 1)
 
-without freq filter, website counts are:
-Dn=1  Ds=1  Pn=2  Ps=2  
-    my script agrees
+Use a 20% threshold to test filtering. Results should be:
 
-with 20% freq filter, website counts are:
-Dn=1  Ds=2  Pn=2  Ps=0  
-    so the website does the right thing - the rare derived allele is ignored, and the rare ancestral allele gets counted as a fixed change
-    my script agrees
+Dn=1, Ds=1,  Pn=2,  Ps=2   without frequency filter
+
+Dn=1, Ds=2,  Pn=2,  Ps=0   with 20% frequency filter
+
 
 ## 3. test3.fa very simple alignment that has only a single change, one rare synon SNP
 
 test3.fa
 pop1_seq01 has a synon change at 10% (bp 6)
-website correctly finds 0 changes with a 20% freq filter
-    my script agrees
+should be 0 changes with a 20% freq filter
 
 test3a.fa - same, but the rare change is in the second seq rather than the first
-website correctly finds 0 changes with a 20% freq filter
-    my script agrees
+should be 0 changes with a 20% freq filter
 
-test3b.fa - a si    my script agrees!
-ngle synonymous change at 90%
-website correctly reassigns that as a fixed change with a 20% freq filter
-    my script agrees
+test3b.fa - a single synonymous change at 90%
+should be 1 fixed synonmouse change with a 20% freq filter
 
 
 # Utility scripts (perl) to help use Popfly data
@@ -127,6 +124,7 @@ advanced usage, specifying an alternative name for the report file, and an alter
 
 ## definitely
 
+make this an R package, with good documentation
 
 ## maybe
 
