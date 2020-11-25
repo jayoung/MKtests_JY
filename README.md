@@ -9,9 +9,20 @@ Can polarize changes if an outgroup is provided
 
 Can filter out low frequency variants (this sometimes results in increased fixed changes, which is counter-intuitive, but occurs when there are polymorphisms where the ancestral allele is at low frequency and the derived allele is the only one that remains after filtering)
 
-I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output
-
 See https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test
+
+I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output. 
+
+A note about the website: it ignores alignment positions where >=1 sequence contains a gap OR an N (e.g. demonstrate that using the two test alignments in MKTwebsite_testAln_addNseqs).  In contrast, my script includes those positions but does not count the gap or N as a change.  Only in the case where one of the populations has only gap or N at a position, then I cannot count any fixed changes in that position.
+
+For particularly gappy alignments, this can be a problem. This is why we used Lisa's script to remove any seq containing Ns.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
+    NNNNNNACGTAGCTA
+    ACGTNNNNNNNNNNN
+    ACGTAGACGTAGCTA
+    ACGTAGACGTAGCTA
+    ACGTAGACGTAGCTA
+    ACGTAGACGTAGCTA
+In this case the website ignores every single position in the alignment because of those first two gappy sequences, and there is nothing left to analyze.  
 
 
 # Test datasets (in test_data)
@@ -112,14 +123,6 @@ advanced usage, specifying an alternative name for the report file, and an alter
 # To do
 
 ## definitely
-
-### Add frequency filter
-
-check that rare variant flagging work in BOTH populations
-
-understand whether to remove the whole SNP from counts, or to remove the rare allele.  
-
-test on more complex data.  Use Arps and Courtney's results
 
 
 ## maybe

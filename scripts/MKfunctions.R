@@ -774,7 +774,8 @@ getMinorMajorAlleles <- function(df,
             minor_allele_freqs <- x[minorAlleles]
             if (flagRareAlleles) {
                 minorAlleleFlags <- rep("common", length(minor_allele_freqs))
-                rareAlleleTest <- which(minor_allele_freqs < alleleFreqThreshold)
+                # use <= to mimic MKT website
+                rareAlleleTest <- which(minor_allele_freqs <= alleleFreqThreshold)
                 if(length(rareAlleleTest)>0) {
                     minorAlleleFlags[rareAlleleTest] <- "rare"
                 }
@@ -833,19 +834,20 @@ filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
     for (i in polymorphicPositions) {
         freqs <- myAln_freqs[,i]
         nonZeroFreqs <- freqs[which(freqs>0)]
-        # if there are no rare alleles, we don't need to do anything
-        if (sum(nonZeroFreqs<alleleFreqThreshold) == 0) {next}
+        # if there are no rare alleles, we don't need to do anything. use <= to mimic MKT website
+        if (sum(nonZeroFreqs <= alleleFreqThreshold) == 0) {next}
         # but if there are, we replace those in the alignment with the major allele (and if there is a tie between major alleles we choose arbitrarily)
         positionsModified <- positionsModified + 1
         majorAllele <- rownames(myAln_freqs)[ which.max(freqs)[1]]
-        rareAlleles <- rownames(myAln_freqs)[ (freqs>0 & freqs<alleleFreqThreshold)]
+        # use <= to mimic MKT website
+        rareAlleles <- rownames(myAln_freqs)[ (freqs>0 & freqs<=alleleFreqThreshold)]
         for (rareAllele in rareAlleles) {
-            cat("removing allele",rareAllele,"at position",i,"\n")
+            #cat("removing allele",rareAllele,"at position",i,"\n")
             myAln_df[,i] <- gsub(rareAllele,majorAllele,myAln_df[,i])
             allelesModified <- allelesModified + 1
         }
     }
-    cat("    modified",allelesModified,"alleles at",positionsModified,"positions\n")
+    cat("        modified",allelesModified,"alleles at",positionsModified,"positions\n")
     # turn the data.frame back into a BStringSet
     aln_filt <- BStringSet(apply(myAln_df, 1, function(y) {
         BString(paste(y, collapse=""))
@@ -863,8 +865,9 @@ filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
 #     "mean" (take mean ns and mean s over all possible combinations) or 
 #     "conservative" (take the count combination that minimizes ns)
 #                     flagRareAlleles=FALSE, alleleFreqThreshold=0
-# flagRareAlleles: flags rare polymorphisms with freq < alleleFreqThreshold, but does not change the MK counts
-# filterRareAlleles: remove rare alleles with freq < alleleFreqThreshold
+# flagRareAlleles: flags rare polymorphisms with freq <= alleleFreqThreshold, but does not change the MK counts
+# filterRareAlleles: remove rare alleles with freq <= alleleFreqThreshold
+#        use <= to mimic MKT website
 # alleleFreqThreshold: used by flagRareAlleles
 # writeAncFasta and writeMKoutput - will I write output files for each individual alignment, or will I wait until I combine output from several aligments (=default) 
 doMKtest <- function(myAlnFile, outDir=NULL,
@@ -955,6 +958,11 @@ doMKtest <- function(myAlnFile, outDir=NULL,
         stop()
     }
     if(!is.null(outgroupSeqs)) {
+        ## check for zero length
+        if(length(unlist(outgroupSeqs))==0) {
+            stop("\n\nERROR - you supplied an empty outgroupSeqs object\n\n")
+        }
+        ## check whether all outgroupSeqs are in the alignment
         if (sum(!unlist(outgroupSeqs) %in% names(aln))>0) {
             missingSeqs <- setdiff(unlist(outgroupSeqs), names(aln))
             cat("ERROR - there are seqs named in the outgroupSeqs argument that are not in the alignment file.\nFile=",
@@ -989,8 +997,8 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     
     codonsHaveOnlyStopsOrNs <- unlist(lapply(aln_codonsUnique, function(x) {
         nonStopOrNcodons <- unique( setdiff( toupper(x), c("TAA","TAG","TGA") ) )
-        # also get rid of any codon containing N
-        nonStopOrNcodons <- grep("N", nonStopOrNcodons, invert=TRUE, value=TRUE)
+        # also get rid of any codon containing N or -
+        nonStopOrNcodons <- grep("N|-", nonStopOrNcodons, invert=TRUE, value=TRUE)
         testOnlyStops <- length(nonStopOrNcodons)==0
         return(testOnlyStops)
     }))
@@ -1019,7 +1027,7 @@ doMKtest <- function(myAlnFile, outDir=NULL,
         ## one alignment for all outgroups
         outgroups_aln <- aln[unlist(outgroupSeqs)]
         # maybe I have several sets of outgroups - get these objects for each set
-        # maybe I don't need all these things
+        # maybe I don't need all these objects - might be able to tidy up code here
         outgroups_seqClassesInAlnOrder <- rep(1:length(outgroupSeqs), 
                                               sapply(outgroupSeqs,length))
         # list of alignments for each outgroup group
@@ -1039,19 +1047,17 @@ doMKtest <- function(myAlnFile, outDir=NULL,
                                     getMinorMajorAlleles, 
                                     flagRareAlleles=flagRareAlleles, 
                                     alleleFreqThreshold=alleleFreqThreshold)
-    
-    #return(aln_tables_majorMinor)
-    cat("        done looking at allele frequencies\n")
-   
+
     #### split alignment by sequence type
     aln_split <- split(aln, seqClassesInAlnOrder)
     
     #### for each of pop1 and pop2, we replace rare alleles with the major allele
     if(filterRareAlleles) {
         alns_filt <- lapply( c("pop1","pop2"), function(thisPop) {
-            filter_aln(aln_split[[thisPop]],alleleFreqThreshold=alleleFreqThreshold)
+            cat("    filtering alleles for",thisPop,"\n")
+            filterAlnRemoveRareVariants(aln_split[[thisPop]],
+                                        alleleFreqThreshold=alleleFreqThreshold)
         })
-        #return(alns_filt)
         names(alns_filt) <- c("pop1","pop2")
         aln_split <- as.list(aln_split)
         ## wierd notation, see my Biostrings github issue https://github.com/Bioconductor/Biostrings/issues/39
@@ -1096,12 +1102,7 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     if (!is.null(outgroupSeqs)) {
         outgroupsForPop2 <- c(outgroupsForPop2, outgroups_aln_split_PositionsUnique)
     }
-    #cat("outgroupsForPop1",paste(outgroupsForPop1,sep=" "),"\n")
-    #cat("outgroupsForPop2",paste(outgroupsForPop2,sep=" "),"\n")
-    #### something is wrong here when I polarize?
     
-    #return(list(ingroup=aln_split_PositionsUnique[["pop1"]], 
-    #            outgroups=outgroupsForPop1))
     pop1_anc_withUncert <- reconstructAncestor_includeUncertainty(
         ingroup=aln_split_PositionsUnique[["pop1"]], 
         outgroups=outgroupsForPop1 )
@@ -1125,18 +1126,19 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     }
     
     #### add inferred ancestors to the alignment and write it out
-    pop1_anc_forFasta <- getAncForFasta(pop1_anc_withUncert)
-    pop2_anc_forFasta <- getAncForFasta(pop2_anc_withUncert)
-    ancAln <- BStringSet(c(pop1_anc_forFasta, pop2_anc_forFasta))
-    names(ancAln) <- c("pop1_anc","pop2_anc")
-    if(polarize) { 
-        pop1_and_pop2_anc_forFasta <- getAncForFasta(pop1_and_pop2_anc_withUncert) 
-        ancAln <- BStringSet(c(pop1_anc_forFasta, pop2_anc_forFasta, pop1_and_pop2_anc_forFasta))
-        names(ancAln) <- c("pop1_anc","pop2_anc","pop1_and_pop2_anc")
+    if(writeAncFasta) {
+        pop1_anc_forFasta <- getAncForFasta(pop1_anc_withUncert)
+        pop2_anc_forFasta <- getAncForFasta(pop2_anc_withUncert)
+        ancAln <- BStringSet(c(pop1_anc_forFasta, pop2_anc_forFasta))
+        names(ancAln) <- c("pop1_anc","pop2_anc")
+        if(polarize) { 
+            pop1_and_pop2_anc_forFasta <- getAncForFasta(pop1_and_pop2_anc_withUncert) 
+            ancAln <- BStringSet(c(pop1_anc_forFasta, pop2_anc_forFasta, pop1_and_pop2_anc_forFasta))
+            names(ancAln) <- c("pop1_anc","pop2_anc","pop1_and_pop2_anc")
+        }
+        newAln <- c(ancAln,aln)
+        writeXStringSet(newAln, outfileAln, format="fasta")
     }
-    newAln <- c(ancAln,aln)
-    writeXStringSet(newAln, outfileAln, format="fasta")
-    
     #### make a table showing what's going on with each alignment position
     cat("    starting output table\n")
     positionTable <- data.frame(pos=1:numNT, 
@@ -1170,6 +1172,7 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     positionTable <- addCountsToTable(positionTable, aln_tables[["pop2"]], "pop2")
     positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop2"]], "pop2", transpose=FALSE)
     if(!is.null(outgroupSeqs)) {
+        return(aln_tables[["out"]]) ## xx temp
         positionTable <- addCountsToTable(positionTable, aln_tables[["out"]], "out")
     }
     
@@ -1251,37 +1254,39 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     finalOutputTable <- cbind(finalOutputTable, MKtable)
     
     ### use openxlsx to write an excel file for MKtable and positionTable (two sheets)
-    cat("    saving tables to Excel file\n")
-    finalOutputTableForExcel <- finalOutputTable
-    positionTableForExcel <- positionTable
-    polyCodonsToColor <- positionTable[which(positionTable[,"pop1_poly"] | 
-                                            positionTable[,"pop2_poly"] & 
-                                            !positionTable[,"fixed_difference"]),"codon"]
-    fixedCodonsToColor <- positionTable[which(positionTable[,"fixed_difference"]),"codon"]
-    polyPositionsToColor <- which(positionTable[,"codon"] %in% polyCodonsToColor)
-    fixedPositionsToColor <- which(positionTable[,"codon"] %in% fixedCodonsToColor)
-    rowIndicesForHorizontalBorder <- which( 
-        positionTable[2:dim(positionTable)[1],"codon"] !=
-        positionTable[1:(dim(positionTable)[1]-1),"codon"] )
-    ### make the excel sheet
-    wb <- createWorkbook()
-    addDataAndFormatWorksheet(wb, 
-                finalOutputTableForExcel, "MKtable", 
-                rotateColNames=90, 
-                colNamesForVerticalBorder=colsForVerticalBorderResultsTables,
-                pop1alias=pop1alias, pop2alias=pop2alias,
-                headerRowHeight=180)
-    addDataAndFormatWorksheet(wb, 
-                positionTableForExcel, "nucleotidePositions", 
-                rotateColNames=90, numColumnsToFreeze=3,
-                colNamesForVerticalBorder=colsForVerticalBorderPositionTables, 
-                rowIndicesForHorizontalBorder=rowIndicesForHorizontalBorder, 
-                rowIndicesColorList=list(green3=polyPositionsToColor, 
-                                         red=fixedPositionsToColor),
-                pop1alias=pop1alias, pop2alias=pop2alias,
-                headerRowHeight=150)
-    saveWorkbook(wb, outfileMK, overwrite = TRUE) # , keepNA = TRUE
-    rm(wb)
+    if(writeMKoutput) {
+        cat("    saving tables to Excel file\n")
+        finalOutputTableForExcel <- finalOutputTable
+        positionTableForExcel <- positionTable
+        polyCodonsToColor <- positionTable[which(positionTable[,"pop1_poly"] | 
+                                                     positionTable[,"pop2_poly"] & 
+                                                     !positionTable[,"fixed_difference"]),"codon"]
+        fixedCodonsToColor <- positionTable[which(positionTable[,"fixed_difference"]),"codon"]
+        polyPositionsToColor <- which(positionTable[,"codon"] %in% polyCodonsToColor)
+        fixedPositionsToColor <- which(positionTable[,"codon"] %in% fixedCodonsToColor)
+        rowIndicesForHorizontalBorder <- which( 
+            positionTable[2:dim(positionTable)[1],"codon"] !=
+                positionTable[1:(dim(positionTable)[1]-1),"codon"] )
+        ### make the excel sheet
+        wb <- createWorkbook()
+        addDataAndFormatWorksheet(wb, 
+                                  finalOutputTableForExcel, "MKtable", 
+                                  rotateColNames=90, 
+                                  colNamesForVerticalBorder=colsForVerticalBorderResultsTables,
+                                  pop1alias=pop1alias, pop2alias=pop2alias,
+                                  headerRowHeight=180)
+        addDataAndFormatWorksheet(wb, 
+                                  positionTableForExcel, "nucleotidePositions", 
+                                  rotateColNames=90, numColumnsToFreeze=3,
+                                  colNamesForVerticalBorder=colsForVerticalBorderPositionTables, 
+                                  rowIndicesForHorizontalBorder=rowIndicesForHorizontalBorder, 
+                                  rowIndicesColorList=list(green3=polyPositionsToColor, 
+                                                           red=fixedPositionsToColor),
+                                  pop1alias=pop1alias, pop2alias=pop2alias,
+                                  headerRowHeight=150)
+        saveWorkbook(wb, outfileMK, overwrite = TRUE) # , keepNA = TRUE
+        rm(wb)
+    }
     return(list(summary=finalOutputTable, positions=positionTable))
 }
 
@@ -1323,6 +1328,15 @@ makeOneMKplot <- function(df,
                           myLwd=2) {
     ## determine x and y limits
     seqLen <- dim(df)[1]
+    
+    ## check all colnames present
+    colNamesNotPresent <- sapply(colNames, function(x) {! x %in% colnames(df) })
+    if(sum(colNamesNotPresent)>0) {
+        missingColNames <- names(colNamesNotPresent)[which(colNamesNotPresent)]
+        cat("\n\nERROR - not all colNames are present in the data frame. The missing ones are:",missingColNames,"\n\n")
+        stop()
+    }
+    
     yMax <- max( c(df[, colNames[["Dn"]] ], df[, colNames[["Ds"]] ],
                    df[, colNames[["Pn"]] ], df[, colNames[["Ps"]] ]), na.rm=TRUE)
     yMax <- yMax + 1
@@ -1337,16 +1351,9 @@ makeOneMKplot <- function(df,
     ## label at y=halfmax for fixed/poly
     mtext("fixed", side=2, at=yMax/2, adj=0.5, line=1.75, srt=90, cex=0.75)
     mtext("poly", side=2, at=(0-yMax/2), adj=0.5, line=1.75, srt=90, cex=0.75)
-    ## non-synon fixed
-    if (sum(df[, colNames[["Dn"]] ]>0)) {
-        Dn_table <- df[,c("codon",colNames[["Dn"]])] 
-        Dn_table <- Dn_table[which(Dn_table[,colNames[["Dn"]] ]>0),]
-        segments(x0=Dn_table[,"codon"], y0=0,
-                 x1=Dn_table[,"codon"], y1=Dn_table[,colNames[["Dn"]] ],
-                 col=myColors[["Dn"]], lwd=myLwd)
-    }
+    
     ## synon fixed 
-    if (sum(df[,colNames[["Ds"]] ]>0)) {
+    if (sum(df[,colNames[["Ds"]] ]>0, na.rm=TRUE)) {
         Ds_table <- df[,c("codon",colNames[["Dn"]],colNames[["Ds"]])] 
         Ds_table <- Ds_table[which(Ds_table[,colNames[["Ds"]] ]>0),]
         # for y1 we start at pop1_vs_pop2_Dn, so that values will be stacked for codons that have both Dn and Ds
@@ -1354,19 +1361,27 @@ makeOneMKplot <- function(df,
                  x1=Ds_table[,"codon"], y1=Ds_table[,colNames[["Ds"]] ],
                  col=myColors[["Ds"]], lwd=myLwd)
     }
-    ## non-synon poly
-    if (sum(df[,colNames[["Pn"]]]>0)) {
-        Pn_table <- df[which(df[, colNames[["Pn"]] ]>0),]
-        segments(x0=Pn_table[,"codon"], y0=0,
-                 x1=Pn_table[,"codon"], y1=(0-Pn_table[, colNames[["Pn"]] ]),
-                 col=myColors[["Pn"]], lwd=myLwd)
+    ## non-synon fixed (plot after synon, to make sure we see them)
+    if (sum(df[, colNames[["Dn"]] ]>0, na.rm=TRUE)) {
+        Dn_table <- df[,c("codon",colNames[["Dn"]])] 
+        Dn_table <- Dn_table[which(Dn_table[,colNames[["Dn"]] ]>0),]
+        segments(x0=Dn_table[,"codon"], y0=0,
+                 x1=Dn_table[,"codon"], y1=Dn_table[,colNames[["Dn"]] ],
+                 col=myColors[["Dn"]], lwd=myLwd)
     }
     ## synon poly
-    if (sum(df[, colNames[["Ps"]] ]>0)) {
+    if (sum(df[, colNames[["Ps"]] ]>0, na.rm=TRUE)) {
         Ps_table <- df[which(df[, colNames[["Ps"]] ]>0),]
         segments(x0=Ps_table[,"codon"], y0=(0-Ps_table[,colNames[["Pn"]] ]),
                  x1=Ps_table[,"codon"], y1=(0-Ps_table[,colNames[["Ps"]] ]),
                  col=myColors[["Ps"]], lwd=myLwd)
+    }
+    ## non-synon poly
+    if (sum(df[,colNames[["Pn"]]]>0, na.rm=TRUE)) {
+        Pn_table <- df[which(df[, colNames[["Pn"]] ]>0),]
+        segments(x0=Pn_table[,"codon"], y0=0,
+                 x1=Pn_table[,"codon"], y1=(0-Pn_table[, colNames[["Pn"]] ]),
+                 col=myColors[["Pn"]], lwd=myLwd)
     }
     
     ## legends
@@ -1380,8 +1395,7 @@ makeOneMKplot <- function(df,
 
 ## df is a position table output by doMKtest
 plotMKpositions <- function(df, title=NULL,
-                            plotPolarizedPop1=FALSE, 
-                            plotPolarizedPop2=FALSE, 
+                            plotPolarizedPop1=FALSE, plotPolarizedPop2=FALSE, 
                             setNumPlots=TRUE, ## will want this FALSE if we set mfrow outside the function
                             pop1alias=NULL, pop2alias=NULL,
                             myColors=list(Dn="red2", Ds="blue2", 
@@ -1397,7 +1411,7 @@ plotMKpositions <- function(df, title=NULL,
     
     ## get data in a better format
     new_df <- prepMKdataForPositionPlot(df)
-    
+
     ## do the unpolarized plot
     titleUnpolarized <- "unpolarized"
     if(!is.null(title)) { titleUnpolarized <- paste(title,titleUnpolarized, sep=" - ") }
