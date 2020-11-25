@@ -116,6 +116,7 @@ what it does:
 - after it finishes, it writes out names of populations it has seen in any of the files. If it doesn't seem to be processing population names quite right, let me know.
     
 advanced usage, specifying an alternative name for the report file, and an alternative minimum population size (you can specify just one of those, don't need to specify both):
+
 `splitSeqsByPopulation.pl --report=JYreport.txt --minPop=80 seqfile(s).fasta`
 
 

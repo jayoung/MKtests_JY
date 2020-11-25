@@ -2,7 +2,7 @@
 
 ##### git hub syncs:
 
-# first time:
+# set up repo for the first time:
 set up a new repo on the github website - I wish I had not done this step
 made a README.md file
 git init
