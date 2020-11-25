@@ -94,12 +94,12 @@ should be 1 fixed synonmouse change with a 20% freq filter
 Useful, because the MK website will ignore changes in alignment positions where some sequences have Ns
 
 usage: 
-    removeSeqsContainingNs.pl seqfile(s).fasta
+`removeSeqsContainingNs.pl seqfile(s).fasta`
 
 what it does:
-   removes all sequences containing 1 or more N bases. 
-   Output file names will end in .noNseqs.fa
-   also creates report file called removeNseq_results.txt to show how many seqs were removed/retained
+- removes all sequences containing 1 or more N bases. 
+- output file names will end in .noNseqs.fa
+- also creates report file called removeNseq_results.txt to show how many seqs were removed/retained
 
 
 ## script 2 - takes a popfly fasta file, splits it by population (ignores small populations, by default)
@@ -107,17 +107,16 @@ what it does:
 Alternatively, you could select individual populations when you download sequences from Popfly.
 
 usage: 
-    splitSeqsByPopulation.pl seqfile(s).fasta
+`splitSeqsByPopulation.pl seqfile(s).fasta`
 
 what it does:
-    parses Popfly sequence names to determine which population each strain is from. 
-    For any population with enough sequences, writes an output file containing only sequences from that population.  Default number of sequences is 50, but you can change that if you like.
-    also creates report file called populationCounts.txt to show how many seqs were in each population
-    
-    after it finishes, it writes out names of populations it has seen in any of the files. If it doesn't seem to be processing population names quite right, let me know.
+- parses Popfly sequence names to determine which population each strain is from. 
+- For any population with enough sequences, writes an output file containing only sequences from that population.  Default number of sequences is 50, but you can change that if you like.
+- also creates report file called populationCounts.txt to show how many seqs were in each population
+- after it finishes, it writes out names of populations it has seen in any of the files. If it doesn't seem to be processing population names quite right, let me know.
     
 advanced usage, specifying an alternative name for the report file, and an alternative minimum population size (you can specify just one of those, don't need to specify both):
-    splitSeqsByPopulation.pl --report=JYreport.txt --minPop=80 seqfile(s).fasta
+`splitSeqsByPopulation.pl --report=JYreport.txt --minPop=80 seqfile(s).fasta`
 
 
 # To do
