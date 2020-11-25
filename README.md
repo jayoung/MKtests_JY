@@ -16,14 +16,14 @@ I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output.
 A note about the website: it ignores alignment positions where >=1 sequence contains a gap OR an N (e.g. demonstrate that using the two test alignments in MKTwebsite_testAln_addNseqs).  In contrast, my script includes those positions but does not count the gap or N as a change.  Only in the case where one of the populations has only gap or N at a position, then I cannot count any fixed changes in that position.
 
 For particularly gappy alignments, this can be a problem. This is why we used Lisa's script to remove any seq containing Ns.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
-<span style="font-family:Courier;">    NNNNNNACGTAGCTA
+```
+    NNNNNNACGTAGCTA
     ACGTNNNNNNNNNNN
     ACGTAGACGTAGCTA
     ACGTAGACGTAGCTA
     ACGTAGACGTAGCTA
-    ACGTAGACGTAGCTA</span>
-
-I am in <span style="font-family:Papyrus; font-size:4em;">LOVE!</span>
+    ACGTAGACGTAGCTA
+```
 
 In this case the website ignores every single position in the alignment because of those first two gappy sequences, and there is nothing left to analyze.  
 
