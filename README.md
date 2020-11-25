@@ -128,8 +128,14 @@ make this an R package, with good documentation
 
 ## maybe
 
-To help troubleshooting, make a trim function, to consider only some portions of the alignment (and it might be useful in general)
+To help troubleshooting, make a trim function, to consider only some portions of the alignment (and it might be useful in general, e.g. to look only at some domains while retaining original alignment coordinates)
 
-Add alternative input methods eg separate input files for each population (and outgroup) - that would allow a script
+Add alternative input methods eg separate input files for each population (and outgroup) - that would allow command-line scripting more easily.  
+
+Build in checks that seq lengths are all the same (within an alignment, or across alignments)
 
 Add methods tab to spreadsheet to capture parameters and warnings, perhaps also a tab to name the seqs used
+
+Continue script to get D simulans strain sequences for a gene from the vcf file and the reference assembly
+
+Figure out a more efficient way to extract D. mel alignments from the Popfly server

@@ -29,3 +29,7 @@ git rm --cached .DS_Store
 git add --all . 
 git commit
 git push
+
+# cloning onto a new computer
+
+git clone https://github.com/jayoung/MKtests_JY.git
