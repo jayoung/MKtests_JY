@@ -1,8 +1,6 @@
 see https://github.com/jayoung/MKtests_JY
 
 
-
-
 ##### git hub syncs:
 
 # set up repo for the first time:
