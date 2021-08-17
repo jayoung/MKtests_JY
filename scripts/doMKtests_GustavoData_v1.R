@@ -12,10 +12,14 @@ setwd("~/Desktop/mac_workStuff/mac_MKtests/MKtests_JY/")
 source("scripts/MKfunctions.R")
 
 
-
 ##### Gustavo's alignments, unpolarized tests
 
-gustavo_alnDir <- "data/Gustavo/originalFilesAsFasta"
+## v1 of alignments, see email Oct 27 2020
+
+
+## now doing MK test
+
+gustavo_alnDir <- "data/Gustavo/v1_2020_Oct27/originalFilesAsFasta"
 
 gustavo_alnFiles <- list.files(gustavo_alnDir, pattern=".fa$", full.names=TRUE)
 names(gustavo_alnFiles) <- gsub(paste(gustavo_alnDir, "/", sep=""), "", gustavo_alnFiles)
@@ -41,7 +45,7 @@ gustavo_populationNames <- lapply(gustavo_alns, function(x){
 ## unpolarized test on all Gustavo alignments - works
 gustavo_results <- lapply (names(gustavo_alnFiles), function(x){
     doMKtest(gustavo_alnFiles[x], 
-             outDir="data/Gustavo/MKresults_unpolarized",
+             outDir="data/Gustavo/v1_2020_Oct27/MKresults_unpolarized",
              pop1seqs=gustavo_populationNames[[x]][["pop1"]], pop1alias="buz",
              pop2seqs=gustavo_populationNames[[x]][["pop2"]], pop2alias="sma" )
 })
@@ -50,14 +54,14 @@ names(gustavo_results) <- names(gustavo_alnFiles)
 ## combine results from all Gustavo alignments
 gustavo_results_all <- combineMKresults(gustavo_results, 
                                         outFile="gustavo_allMKresults_unpolarized.xlsx",
-                                        outDir="data/Gustavo/MKresults_unpolarized",
+                                        outDir="data/Gustavo/v1_2020_Oct27/MKresults_unpolarized",
                                         getGeneNames=FALSE, 
                                         pop1alias="buz", pop2alias="sma")
 
 ## polarized test on all Gustavo alignments - works
 gustavo_results_polarized <- lapply (names(gustavo_alnFiles), function(x){
     doMKtest(gustavo_alnFiles[x], 
-             outDir="data/Gustavo/MKresults_polarized",
+             outDir="data/Gustavo/v1_2020_Oct27/MKresults_polarized",
              pop1seqs=gustavo_populationNames[[x]][["pop1"]], pop1alias="buz",
              pop2seqs=gustavo_populationNames[[x]][["pop2"]], pop2alias="sma",
              outgroupSeqs=gustavo_populationNames[[x]][["out"]],
@@ -68,12 +72,12 @@ names(gustavo_results_polarized) <- names(gustavo_alnFiles)
 ## combine results from all Gustavo alignments
 gustavo_results_polarized_all <- combineMKresults(gustavo_results_polarized, 
                                                   outFile="gustavo_allMKresults_polarized.xlsx",
-                                                  outDir="data/Gustavo/MKresults_polarized",
+                                                  outDir="data/Gustavo/v1_2020_Oct27/MKresults_polarized",
                                                   getGeneNames=FALSE, 
                                                   pop1alias="buz", pop2alias="sma")
 
 
-pdf(height=5,width=15,file="data/Gustavo/MKresults_polarized/gustavo_allMKresults_polarized.pdf")
+pdf(height=5,width=15,file="data/Gustavo/v1_2020_Oct27/MKresults_polarized/gustavo_allMKresults_polarized.pdf")
 ## using layout rather than par-mfrow so that plots get added in columns before rows
 layout(matrix(1:9, nrow=3, ncol=3))
 for (x in names(gustavo_results_polarized)) {

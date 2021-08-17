@@ -357,8 +357,11 @@ combineMKresults <- function(MKresultList, outFile, outDir=NULL,
     }
     
     #### add positions tables
+    #cat("    adding position tables\n")
     positionsTables <- lapply(MKresultList, "[[", "positions")
+    names(positionsTables) <- names(MKresultList)
     for (resultName in names(positionsTables)) {
+        #cat("    adding position table for",resultName,"\n")
         posTable <- positionsTables[[resultName]]
         polyCodonsToColor <- posTable[which(posTable[,"pop1_poly"] | 
                                   posTable[,"pop2_poly"] & 
@@ -896,7 +899,10 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     outfileStem <- gsub(".fa$","", outfileStem)
     outfileStem <- paste(outfileStem, sep=".")
     if (!is.null(outDir)) {
-        if (!dir.exists(outDir)) { dir.create(outDir) }
+        if (!dir.exists(outDir)) { 
+            # only need to make the output dir if we aregoing to write either of the output file types
+            if(writeAncFasta | writeMKoutput) { dir.create(outDir) }
+        }
         # strip off old directory path before adding the new one:
         outfileStem <- strsplit(outfileStem,"/")[[1]]
         outfileStem <- outfileStem[length(outfileStem)]
@@ -1172,7 +1178,6 @@ doMKtest <- function(myAlnFile, outDir=NULL,
     positionTable <- addCountsToTable(positionTable, aln_tables[["pop2"]], "pop2")
     positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop2"]], "pop2", transpose=FALSE)
     if(!is.null(outgroupSeqs)) {
-        return(aln_tables[["out"]]) ## xx temp
         positionTable <- addCountsToTable(positionTable, aln_tables[["out"]], "out")
     }
     
