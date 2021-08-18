@@ -160,7 +160,7 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter, paths=codonPaths) {
     # I could perhaps average out over the uncertainty ?
 }
 
-#### getCodonChangeCountsFromCodonList = function to get counts of synon and non-synon changes between sets of codons (character vectors)
+#### getCodonChangeCountsFromCodonList: a function to get counts of synon and non-synon changes between sets of codons (character vectors)
 # this version allows for ambiguity within a codon, and averages result over that ambiguity
 # now, input= two lists to compare. Each list has one element per codon, containing character vector of the codons to compare
 # combiningApproach can be:
@@ -169,6 +169,7 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter, paths=codonPaths) {
 getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter, 
                                               paths=codonPaths, 
                                               combiningApproach="conservative") {
+    ### some checks
     if (length(codonListBefore) != length(codonListAfter)){
         stop("\n\nERROR in getCodonChangeCountsFromCodonList - codonListBefore and codonListAfter are different lengths\n\n")    
     }
@@ -183,6 +184,7 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
         stop("\n\nERRR in getCodonChangeCountsFromCodonList - there are stop codon(s) in codonListAfter\n\n")
     }
     
+    ### get counts, one codon position at a time
     numCodons <- length(codonListBefore)
     counts <- lapply(1:numCodons, function(i) {
         before <- codonListBefore[[i]]
@@ -213,13 +215,126 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
 
 
 
-##### categorizePolymorphisms_new - this time we use the sequences directly
+
+
+##### categorizePolymorphisms_new_byCodon - this time we use the sequences directly
+# this version now considers one codon at a time
 # ancCodons_withUncert - a list, one element per codon, each of which is character vector of possible ancestral codons that we will 'inject' non-ancestral alleles into
 # allelesByNuc  - a list, one element per nucleotide, each of which is character vector of alleles
 # combiningApproach can be:
 #     "mean" (take mean ns and mean s over all possible combinations) or 
 #     "conservative" (take the count combination that minimizes ns)
-categorizePolymorphisms_new <- function(ancCodons_withUncert, 
+
+categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert, 
+                                                allelesByNuc, 
+                                                combiningApproach="conservative") {
+    if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
+        stop("ERROR - allelesByNuc and ancCodons_withUncert respresent sequences of different lengths\n\n")    
+    }
+    if (!combiningApproach %in% c("mean","conservative") ) {
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative\n\n")
+    }
+    
+    #### work on each codon at a time
+    counts <- lapply(1:length(ancCodons_withUncert), function(i) {
+        thisCodonStartPos <- 3*(i-1) + 1
+        thisCodonEndPos <- thisCodonStartPos+2
+        allelesByNucThisCodon <- allelesByNuc[ thisCodonStartPos:thisCodonEndPos ]
+        
+        ## for each polymorphic position, I will consider it in all possible contexts given polymorphisms at other positions in the same codon, ignoring stop codons
+        changesThisCodon <- list()
+        # the polymorphic position we are considering is at position j within the codon
+        for (j in 1:3) {
+            alleles <- allelesByNucThisCodon[[j]]
+            if (length(alleles)==1) { # fixed positions
+                changesThisCodon[[j]] <- list(ns=0,s=0)
+                next
+            }
+            # remaining positions are polymorphic
+            ancCodons <- ancCodons_withUncert[[ i ]]
+            otherPositionsSameCodon <- setdiff(1:3, j)
+            
+            #cat("\ncodon",i,"position",j,"\n")
+            #cat("ancCodons",ancCodons,"\n")
+            #cat("alleles",alleles,"\n")
+            
+            ## look at SNPs in the OTHER codon positions to make sure I'm considering all contexts for the current SNP
+            # collect all possible pre-polymorphisms codons in allBeforeCodons
+            allBeforeCodons <- ancCodons
+            for (k in otherPositionsSameCodon) {
+                otherNucsSameCodon <- allelesByNucThisCodon[[k]]
+                for (ancCodon in ancCodons) {
+                    newAncCodon <- ancCodon
+                    for (nuc in otherNucsSameCodon) {
+                        substring(newAncCodon,k,k) <- nuc
+                        if(!newAncCodon %in% allBeforeCodons) { 
+                            if(!newAncCodon  %in% stopCodons) {
+                                allBeforeCodons <- c(allBeforeCodons, newAncCodon)
+                            }
+                        }
+                    }
+                }
+                #cat("    otherNucsSameCodon pos ",k,"nucs",otherNucsSameCodon,"\n")
+            }
+            
+            ### then inject each allele of the current polymorphism into each of the allBeforeCodons.
+            # we keep any where before and after are different, and don't involve stop codons
+            beforeCodonsToCheck <- character()
+            afterCodonsToCheck <- character()
+            for (allele in alleles) {
+                for (beforeCodon in allBeforeCodons) {
+                    thisAfterCodon <- beforeCodon
+                    substring(thisAfterCodon,j,j) <- allele
+                    if (thisAfterCodon %in% stopCodons) { next }
+                    if (thisAfterCodon != beforeCodon) { 
+                        beforeCodonsToCheck <- c(beforeCodonsToCheck,beforeCodon) 
+                        afterCodonsToCheck <- c(afterCodonsToCheck,thisAfterCodon) 
+                    }
+                }
+            }
+            #cat("beforeCodonsToCheck",beforeCodonsToCheck,"\n")
+            #cat("afterCodonsToCheck",afterCodonsToCheck,"\n")
+            results <- getCodonChangeCounts(beforeCodonsToCheck, afterCodonsToCheck)
+            if (combiningApproach=="mean") {
+                ns <- mean(results[,"ns"])
+                s <- mean(results[,"s"])
+            }
+            if (combiningApproach=="conservative") {
+                mostConservativeRow <- which.min(results[,"ns"])[1]
+                ns <- results[mostConservativeRow,"ns"]
+                s <- results[mostConservativeRow,"s"]
+            }
+            results <- list(ns=ns, s=s)
+            changesThisCodon[[j]] <- results
+        }
+        changesThisCodon_df <- data.frame(Pn=sapply(changesThisCodon, "[[", "ns"), 
+                                          Ps=sapply(changesThisCodon, "[[", "s"))
+        return(changesThisCodon_df)
+    })
+    ## add codon index to each of those tables
+    counts <- lapply(1:length(counts), function(i) {
+        tempDF <- counts[[i]]
+        tempDF[,"codon"] <- i
+        tempDF[,"codonPos"] <- rownames(tempDF)
+        tempDF <- tempDF[,c("codon", "codonPos", "Pn", "Ps")]
+        return(tempDF)
+    })
+    counts_df <- do.call("rbind", counts)
+    #print (counts_df)
+    #cat("\n\nFinished in categorizePolymorphisms_new_byCodon function\n\n")
+    return(counts_df)
+}
+
+
+
+##### categorizePolymorphisms_new_byNuc - this time we use the sequences directly
+# this version still considers one nucleotide at a time, but there are unusual cases where we need to consider all polymorphisms within the same codon at the same time, so I need to change this. An example is in test_unusualPolymorphism.fa
+# ancCodons_withUncert - a list, one element per codon, each of which is character vector of possible ancestral codons that we will 'inject' non-ancestral alleles into
+# allelesByNuc  - a list, one element per nucleotide, each of which is character vector of alleles
+# combiningApproach can be:
+#     "mean" (take mean ns and mean s over all possible combinations) or 
+#     "conservative" (take the count combination that minimizes ns)
+categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert, 
                                         allelesByNuc, 
                                         combiningApproach="conservative") {
     if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
@@ -495,7 +610,6 @@ doMKtest <- function(myAlnFile=NULL,
                      writeAncFasta=FALSE, writeMKoutput=FALSE,
                      quiet=FALSE) {
     
-    require(openxlsx)
     ### some checks
     if(is.null(myAln) & is.null(myAlnFile)) {
         stop("\n\nERROR in doMKtest - must specify either the name of an alignment file, or a BStringSet alignment object\n\n")
@@ -839,13 +953,13 @@ doMKtest <- function(myAlnFile=NULL,
     
     ### categorizes the (pop1) polymorphisms, adding pop1_Pn and pop1_Ps to positionTable
     cat("    categorizing polymorphisms\n")
-    pop1_polyCounts <- categorizePolymorphisms_new(pop1_anc_withUncert_codons, 
+    pop1_polyCounts <- categorizePolymorphisms_new_byCodon(pop1_anc_withUncert_codons, 
                                                   aln_split_PositionsUnique[["pop1"]],
                                                   combiningApproach=combiningApproach)
     colnames(pop1_polyCounts) <- paste("pop1", colnames(pop1_polyCounts), sep="_")
     positionTable <- cbind(positionTable, pop1_polyCounts)
     
-    pop2_polyCounts <- categorizePolymorphisms_new(pop2_anc_withUncert_codons, 
+    pop2_polyCounts <- categorizePolymorphisms_new_byCodon(pop2_anc_withUncert_codons, 
                                                   aln_split_PositionsUnique[["pop2"]],
                                                   combiningApproach=combiningApproach)
     colnames(pop2_polyCounts) <- paste("pop2", colnames(pop2_polyCounts), sep="_")
@@ -877,7 +991,6 @@ doMKtest <- function(myAlnFile=NULL,
             positionTable[,"pop2_polarized_Ds"] 
     }
     
-    #return(positionTable)
     cat("    doing MK tests\n")
     MKtable <- MKoutput(positionTable, polarize=polarize)
     
@@ -908,4 +1021,3 @@ doMKtest <- function(myAlnFile=NULL,
     }
     return(list(summary=finalOutputTable, positions=positionTable))
 }
-

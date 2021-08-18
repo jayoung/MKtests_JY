@@ -161,7 +161,7 @@ test3_results_all <- combineMKresults(test3_results,
 test4_alnFile <- "test_data/test_unusualPolymorphism/test_unusualPolymorphism.fa"
 
 
-test4_result <- doMKtest(myAlnFile=test4_alnFile, 
+test4_result <- doMKtest(myAlnFile=test4_alnFile, writeMKoutput=TRUE,
                          outfileStem="test4", 
                          pop1seqs=c("pop1_seq1","pop1_seq2","pop1_seq3"),
                          pop2seqs=c("pop2_seq1"), 

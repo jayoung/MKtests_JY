@@ -4,6 +4,7 @@
 writeOneMKtestToExcel <- function(finalOutputTable, positionTable, 
                                   outfileMK,
                                   pop1alias=NULL, pop2alias=NULL) {
+    require(openxlsx)
     cat("    saving tables to Excel file\n")
     polyCodonsToColor <- positionTable[which(positionTable[,"pop1_poly"] | 
                                                  positionTable[,"pop2_poly"] & 
@@ -40,11 +41,19 @@ combineMKresults <- function(MKresultList, outFile, outDir=NULL,
                              pop1alias=NULL, pop2alias=NULL,
                              getGeneNames=FALSE, geneNameFile="riniTable2_geneOrder.txt", 
                              rowBordersEachGene=FALSE) {
-    
+    require(openxlsx)
     #### check outDir is present
     if(!is.null(outDir)) {
         if (!dir.exists(outDir)) { dir.create(outDir) }
         outFile <- paste(outDir,outFile,sep="/")
+    }
+    
+    #### check they have names
+    if(is.null(names(MKresultList))) {
+        stop("\n\nERROR - the results list must have names\n\n")
+    }
+    if(length(unique(names(MKresultList))) != length(MKresultList) ) {
+        stop("\n\nERROR - each item in the results list must have a unique name\n\n")
     }
     
     #### combine results into a single table

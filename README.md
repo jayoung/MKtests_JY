@@ -91,6 +91,8 @@ pop1_seq3   GAG
 pop2_seq1   GAG
 ```
 
+(file = BigH1_CDS_with_sim.fasta.  problem codon = bases 853-855, and choosing seqs 1,16,28,1115 demonstrates the issue)
+
 In this case, the ancestral codon of pop1 is most likely to be GAG.
 
 The A->C polymorphism at position 2 is counted OK as a non-synonymous polymorphism
