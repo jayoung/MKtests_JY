@@ -99,10 +99,9 @@ The A->C polymorphism at position 2 is counted OK as a non-synonymous polymorphi
 
 The G->T polymorphism at position 1 created a problem for one version of my code - if it occurred on the background of the ancestral codon it would create a stop codon (GAG->TAG), which I don't know how to count So it must have occurred on the 'intermediate' codon (GCG->TCG), and therefore is also a non-synonymous codon.
 
-I have fixed the initial problem, where it simply broke the code. However, I don't think I am counting it right now. The MKT website counts this as 2 non-synonymous polymorphisms. 
+I have fixed the code so that it counts this as 2 non-synonymous polymorphisms, just like the MKT website. 
 
-I count changes from before codon -> after codon
-using ancestral codon as before. But perhaps I need to count over all possible before codons for polymorphisms.  All pairwise combinations of codons ??  see if the MKT website says how they do it
+I count changes from before codon -> after codon.  I use the ancestral codon but also any codons created by other SNPs in the same codon (ignoring any stop codons, as they should be impossible).
 
 
 # Utility scripts (in perl) to help use Popfly data
