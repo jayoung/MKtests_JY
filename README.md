@@ -78,7 +78,7 @@ test3a.fa - same, but the rare change is in the second seq rather than the first
 should be 0 changes with a 20% freq filter
 
 test3b.fa - a single synonymous change at 90%
-should be 1 fixed synonmouse change with a 20% freq filter
+should be 1 fixed synonymous change with a 20% freq filter
 
 
 ## 4. test_unusualPolymorphism.fa
