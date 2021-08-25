@@ -100,3 +100,30 @@ for (x in names(gustavo_results_polarized)) {
 dev.off()
 
 
+######## do an unpolarized test on buz versus stl (Gustavo was using stl as an outgroup to polarize, but Ching-Ho suggested we also try two species that are a little further away from each other to see if that has more power in the MK test)
+
+gustavo_populationNames_buzStl <- lapply(gustavo_alns, function(x){
+    populationNames <- list()
+    populationNames[["pop1"]] <- grep("buz", names(x), value=TRUE)
+    populationNames[["pop2"]] <- grep("stl", names(x), value=TRUE)
+    return(populationNames)
+})
+# sapply(gustavo_populationNames_buzStl, function(x) { sapply(x, length)})
+
+## unpolarized test on all Gustavo alignments - works
+gustavo_results_buzStl <- lapply (names(gustavo_alnFiles), function(x){
+    doMKtest(gustavo_alnFiles[x], 
+             #outDir="data/Gustavo/v2_2021_Aug16/MKresults_unpolarized_buzStl",
+             pop1seqs=gustavo_populationNames_buzStl[[x]][["pop1"]], pop1alias="buz",
+             pop2seqs=gustavo_populationNames_buzStl[[x]][["pop2"]], pop2alias="stl" )
+})
+names(gustavo_results_buzStl) <- names(gustavo_alnFiles)
+
+## combine results from all Gustavo alignments
+gustavo_results_buzStl_all <- combineMKresults(gustavo_results_buzStl, 
+                                        outFile="gustavo_allMKresults_unpolarized_buzStl.xlsx",
+                                        outDir="data/Gustavo/v2_2021_Aug16/MKresults_unpolarized",
+                                        getGeneNames=FALSE, 
+                                        pop1alias="buz", pop2alias="stl")
+
+
