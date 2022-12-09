@@ -1,9 +1,157 @@
 #### excel output
 
+
+#### addDataAndFormatWorksheet - used in other functions for Excel output
+addDataAndFormatWorksheet <- function(myWB, df, sheetName, 
+                                      keepNA=TRUE, 
+                                      NAcharacter="N.A.", # only used if keepNA==FALSE
+                                      rotateColNames=0, headerRowHeight=NULL, 
+                                      numColumnsToFreeze=0,
+                                      colNamesForVerticalBorder=NULL,
+                                      rowIndicesForHorizontalBorder=NULL,
+                                      colNamesForBold=NULL, 
+                                      # rowIndicesColorList is a list, where names are colors, and contents are numerical indices of rows to have that color
+                                      rowIndicesColorList=NULL, 
+                                      # options above are generic, whereas option below are specific to MK test situation
+                                      boldPvalColumns=TRUE,
+                                      roundSomeColumns=TRUE,
+                                      pop1alias=NULL, pop2alias=NULL,
+                                      extraVerbose=FALSE) {
+    require(openxlsx)
+    ## prep the data frame
+    df2 <- df
+    # in p-value and NI and alpha columns, replace NA/NaN with "N.A." and infinite values with "Inf". Keep track of which columns I have some characters in, so I can avoid making Excel think they're numeric
+    
+    columnsContainingCharacter <- list()
+    
+    for (tempCol in grep("pVal|_NI$|_alpha$",colnames(df2),value=TRUE)) {
+        ## I was previously ALWAYS replacing NA/NaN with "N.A." but that messes up Excel formatting when I want to round all the other values in the column. If I switch the NAs to a text value (NAcharacter) I need to do any rounding manyally
+        if (!keepNA) {
+            if (roundSomeColumns) {
+                df2[,tempCol] <- round(df2[,tempCol], digits=3)
+            }
+            df2[which(is.nan(df2[,tempCol])),tempCol] <- NAcharacter
+            df2[which(is.na(df2[,tempCol])),tempCol] <- NAcharacter
+        }
+        df2[which(is.infinite(df2[,tempCol])),tempCol] <- "Inf"
+        if(sum(df2[,tempCol] %in% c("Inf", NAcharacter) )>0) {
+            columnsContainingCharacter[[tempCol]] <- 1
+        }
+    }
+    if(boldPvalColumns) {
+        pValColNames <- grep("_pVal$", colnames(df2), value=TRUE)
+        if(is.null(colNamesForBold)) {
+            colNamesForBold <- pValColNames
+        } else {
+            colNamesForBold <- c(colNamesForBold,pValColNames)
+        }
+    }
+    if(!is.null(colNamesForVerticalBorder)) {
+        colIndicesForVerticalBorder <- which(colnames(df2) %in% 
+                                                 colNamesForVerticalBorder)
+    }
+    if (!is.null(colNamesForBold)) {
+        colIndicesForBold <- which(colnames(df2) %in% colNamesForBold)
+    }
+    
+    ## fix up various column names
+    colnames(df2) <- gsub("_"," ", colnames(df2))
+    ## population aliases
+    if (!is.null(pop1alias)) { colnames(df2) <- gsub("pop1", pop1alias, colnames(df2)) } 
+    if (!is.null(pop2alias)) { colnames(df2) <- gsub("pop2", pop2alias, colnames(df2)) }
+    
+    options("openxlsx.borderColour" = "black")
+    addWorksheet(myWB, sheetName, zoom=120)
+    freezePane(myWB, sheetName, firstRow = TRUE)
+    if (numColumnsToFreeze>0) {
+        freezePane(myWB, sheetName, 
+                   firstActiveRow=2, 
+                   firstActiveCol=LETTERS[(numColumnsToFreeze+1)])
+    }
+    myHeaderStyle <- createStyle(fontName="Arial", fontSize = 12, 
+                                 wrapText=TRUE, textRotation=rotateColNames, 
+                                 textDecoration="bold", valign="top")
+    writeData(myWB, sheetName, df2, keepNA=keepNA,
+              headerStyle=myHeaderStyle, borderStyle="none")
+    ## format header row
+    addFilter(myWB, sheetName, row=1, cols=1:ncol(df2))
+    if (!is.null(headerRowHeight)) {
+        setRowHeights(myWB, sheetName, rows=1, heights=headerRowHeight)
+    }
+    ## some formatting for ALL cells except header row:
+    myStyle <- createStyle(fontName="Arial", fontSize = 12) 
+    addStyle(myWB, sheetName, myStyle, stack=TRUE, 
+             cols=1:dim(df2)[2], rows=1:dim(df2)[1]+1, gridExpand=TRUE)
+    setColWidths(myWB, sheetName, cols=1:dim(df2)[2], widths = "auto")
+    # vertical border before selected columns:
+    if(!is.null(colNamesForVerticalBorder)) {
+        addStyle(myWB, sheetName, createStyle(border="left"), stack=TRUE, 
+                 cols=colIndicesForVerticalBorder, 
+                 rows=0:dim(df2)[1]+1, gridExpand=TRUE)
+    }
+    # horizontal border after selected rows:
+    if(!is.null(rowIndicesForHorizontalBorder)) {
+        addStyle(myWB, sheetName, createStyle(border="bottom"), stack=TRUE, 
+                 rows=rowIndicesForHorizontalBorder+1, 
+                 cols=1:dim(df2)[2], gridExpand=TRUE)
+    }
+    # bold for selected columns (each table):
+    if(!is.null(colNamesForBold)) {
+        addStyle(myWB, sheetName, 
+                 createStyle(textDecoration="bold"), stack=TRUE, 
+                 cols=colIndicesForBold, 
+                 rows=0:dim(df2)[1]+1, gridExpand=TRUE)
+    }
+    
+    if(!is.null(rowIndicesColorList)) {
+        for(thisColor in names(rowIndicesColorList)) {
+            addStyle(myWB, sheetName, 
+                     createStyle(fontColour=thisColor), stack=TRUE, 
+                     rows=(rowIndicesColorList[[thisColor]]+1), 
+                     cols=0:dim(df2)[2]+1, gridExpand=TRUE)
+        }
+    }
+    
+    # round some columns. doesn't work right if there are some text values (e.g NA or Inf). There is some sort of answer to this on the internet (search for something like 'openxls format numbers stored as text') but it is too convoluted to be worth the effort
+    if(roundSomeColumns) {
+        # if we replaced NA values with a text string, Excel gets fussy if we convert to number format, if there were any NAs, but I'm not going to the trouble of testing to see if there were
+        if (keepNA) {
+            columnsToRound <- grep(" pVal| NI| alpha", colnames(df2))
+            if(extraVerbose) { cat("columnsToRound ",columnsToRound,"\n") }
+            if (length(columnsToRound)>0) {
+                addStyle(myWB, sheetName, createStyle(numFmt="0.000"), stack=TRUE, 
+                         cols=columnsToRound, 
+                         rows=0:dim(df2)[1]+1, 
+                         gridExpand=TRUE)
+            }
+        }
+    }
+    
+    # some columns need to be converted to text
+    if (length(columnsContainingCharacter)>0) {
+        for (tempCol in names(columnsContainingCharacter)) {
+            cat("converting column",tempCol,"to text\n")
+            addStyle(myWB, sheetName, createStyle(numFmt="TEXT"), stack=TRUE, 
+                     cols=tempCol, 
+                     rows=0:dim(df2)[1]+1, 
+                     gridExpand=TRUE)
+        }
+    }
+    
+        # if we did replace any of the NA values with a text string, let's convert the column to a text column to avoid the warnings Excel shows
+        #if (!keepNA) {
+        #    for (tempCol in columnsToRound)
+        #}
+    
+}
+
 ### use openxlsx to write an excel file for MKtable and positionTable (two sheets)
 writeOneMKtestToExcel <- function(finalOutputTable, positionTable, 
                                   outfileMK,
-                                  pop1alias=NULL, pop2alias=NULL) {
+                                  pop1alias=NULL, pop2alias=NULL,
+                                  keepNA = TRUE,
+                                  NAcharacter="N.A." # only used if keepNA==FALSE
+                                  ) {
     require(openxlsx)
     cat("    saving tables to Excel file\n")
     polyCodonsToColor <- positionTable[which(positionTable[,"pop1_poly"] | 
@@ -17,12 +165,15 @@ writeOneMKtestToExcel <- function(finalOutputTable, positionTable,
             positionTable[1:(dim(positionTable)[1]-1),"codon"] )
     ### make the excel sheet
     wb <- createWorkbook()
+    ### the MK results
     addDataAndFormatWorksheet(wb, 
                               finalOutputTable, "MKtable", 
                               rotateColNames=90, 
                               colNamesForVerticalBorder=colsForVerticalBorderResultsTables,
                               pop1alias=pop1alias, pop2alias=pop2alias,
-                              headerRowHeight=180)
+                              headerRowHeight=180, 
+                              keepNA=keepNA, NAcharacter=NAcharacter)
+    ### the table showing what's going on at each position
     addDataAndFormatWorksheet(wb, 
                               positionTable, "nucleotidePositions", 
                               rotateColNames=90, numColumnsToFreeze=3,
@@ -37,10 +188,13 @@ writeOneMKtestToExcel <- function(finalOutputTable, positionTable,
 }
     
 ### combineMKresults: takes MK results from several alignments and makes a single output file / table
-combineMKresults <- function(MKresultList, outFile, outDir=NULL,
+combineMKresults <- function(MKresultList, outFile, outDir=NULL, 
+                             keepNA=TRUE, NAcharacter="N.A.",
                              pop1alias=NULL, pop2alias=NULL,
                              getGeneNames=FALSE, geneNameFile="riniTable2_geneOrder.txt", 
-                             rowBordersEachGene=FALSE) {
+                             rowBordersEachGene=FALSE,
+                             roundSomeColumns=TRUE,
+                             extraVerbose=FALSE) {
     require(openxlsx)
     #### check outDir is present
     if(!is.null(outDir)) {
@@ -83,12 +237,14 @@ combineMKresults <- function(MKresultList, outFile, outDir=NULL,
     ####### save output to excel file
     results_df_forOutput <- results_df
     wb <- createWorkbook()
-    addDataAndFormatWorksheet(wb, 
+    addDataAndFormatWorksheet(wb, keepNA=keepNA, NAcharacter=NAcharacter,
                               results_df_forOutput, "MKtests", 
                               rotateColNames=90, 
                               colNamesForVerticalBorder=colsForVerticalBorderResultsTables, 
                               pop1alias=pop1alias, pop2alias=pop2alias,
-                              headerRowHeight=180)
+                              headerRowHeight=180,
+                              roundSomeColumns=roundSomeColumns,
+                              extraVerbose=extraVerbose)
     # rows where new gene occurs have a border above. This is an old thing for when I was looking at Rini's alignments, including sub-alignments for different domains
     if(rowBordersEachGene) {
         tempRowsToTest <- 2:dim(results_df_forOutput)[1]
@@ -115,7 +271,7 @@ combineMKresults <- function(MKresultList, outFile, outDir=NULL,
         rowIndicesForHorizontalBorder <- which( 
             posTable[2:dim(posTable)[1],"codon"] != 
                 posTable[1:(dim(posTable)[1]-1),"codon"] )
-        addDataAndFormatWorksheet(wb, 
+        addDataAndFormatWorksheet(wb, keepNA=FALSE,
                                   df=posTable, 
                                   sheetName=resultName, 
                                   rotateColNames=90, numColumnsToFreeze=3,

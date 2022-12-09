@@ -1,4 +1,4 @@
-## might be a bug.   Risa's mel-sim polarized test revealed a potential problem.
+## figuring out a bug.   Risa's mel-sim polarized test revealed a potential problem.
 library(Biostrings)
 library(here)
 
@@ -39,7 +39,7 @@ MKresults[["unpolarizedA"]] <- doMKtest(alnFile,
                                         pop1seqs=populationIDs[["popA"]], pop1alias="popA",
                                         pop2seqs=populationIDs[["popB"]], pop2alias="popB"#,
                                         #writeMKoutput=TRUE
-                                        )
+)
 
 MKresults[["unpolarizedB"]] <- doMKtest(alnFile, 
                                         pop1seqs=populationIDs[["popB"]], pop2alias="popB",
@@ -63,14 +63,15 @@ MKresults[["polarizedB"]] <- doMKtest(alnFile,
 
 ## combine and save to Excel files
 MKresults_unpolarized <- combineMKresults(MKresults[1:2], 
-                                  outFile="test_ambiguousCodon_MKresults_unpolarized.xlsx",
-                                  outDir=here("test_data/test_ambiguousCodon"),
-                                  getGeneNames=FALSE)
-
-MKresults_polarized <- combineMKresults(MKresults[3:4], 
-                                          outFile="test_ambiguousCodon_MKresults_polarized.xlsx",
+                                          outFile="test_ambiguousCodon_MKresults_unpolarized.xlsx",
                                           outDir=here("test_data/test_ambiguousCodon"),
                                           getGeneNames=FALSE)
+
+MKresults_polarized <- combineMKresults(MKresults[3:4], 
+                                        outFile="test_ambiguousCodon_MKresults_polarized.xlsx",
+                                        outDir=here("test_data/test_ambiguousCodon"),
+                                        getGeneNames=FALSE,
+                                        extraVerbose=TRUE)
 
 
 
@@ -106,8 +107,8 @@ risa_popIDs[["popDat_bothSpecies"]][["sim"]] <- grep("CM015606|sim", names(risa_
 risa_popIDs[["popDat_bothSpecies"]][["yak"]] <- grep("yakuba", names(risa_alns[["popDat_bothSpecies"]]), value=TRUE)
 ## mel is everything else:
 risa_popIDs[["popDat_bothSpecies"]][["mel"]] <- setdiff(names(risa_alns[["popDat_bothSpecies"]]), 
-                                                    c(risa_popIDs[["popDat_bothSpecies"]][["sim"]],
-                                                      risa_popIDs[["popDat_bothSpecies"]][["yak"]])) 
+                                                        c(risa_popIDs[["popDat_bothSpecies"]][["sim"]],
+                                                          risa_popIDs[["popDat_bothSpecies"]][["yak"]])) 
 ## sanity check
 # lapply(risa_popIDs, function(x) { sapply(x, length)})
 
@@ -168,14 +169,15 @@ risa_MKresults[["popDat_bothSpecies_polarizedB"]] <- doMKtest(
 
 ## combine and save to Excel files
 risa_MKresults_unpolarized <- combineMKresults(risa_MKresults[ grep("_unpolarized", names(risa_MKresults)) ], 
-                                          outFile="risa_MKresults_unpolarized.xlsx",
-                                          outDir=here("data/Risa/2022_Dec7"),
-                                          getGeneNames=FALSE)
+                                               outFile="risa_MKresults_unpolarized.xlsx",
+                                               outDir=here("data/Risa/2022_Dec7"),
+                                               getGeneNames=FALSE)
 
 risa_MKresults_polarized <- combineMKresults(risa_MKresults[ grep("_polarized", names(risa_MKresults)) ], 
-                                        outFile="risa_MKresults_polarized.xlsx",
-                                        outDir=here("data/Risa/2022_Dec7"),
-                                        getGeneNames=FALSE)
+                                             outFile="risa_MKresults_polarized.xlsx",
+                                             outDir=here("data/Risa/2022_Dec7"),
+                                             getGeneNames=FALSE, 
+                                             keepNA=FALSE, NAcharacter="")
 
 
 ### sanity check:  now, after fixing code:
