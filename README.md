@@ -143,16 +143,60 @@ advanced usage, specifying an alternative name for the report file, and an alter
 
 make this an R package, with good documentation
 
-## maybe
+finish methods description below
 
-To help troubleshooting, make a trim function, to consider only some portions of the alignment (and it might be useful in general, e.g. to look only at some domains while retaining original alignment coordinates)
+## maybe
 
 Add alternative input methods eg separate input files for each population (and outgroup) - that would allow command-line scripting more easily.  
 
-Build in checks that seq lengths are all the same (within an alignment, or across alignments)
-
-Add methods tab to spreadsheet to capture parameters and warnings, perhaps also a tab to name the seqs used
-
-Continue script to get D simulans strain sequences for a gene from the vcf file and the reference assembly
+Continue script to get D simulans strain sequences for a gene from the vcf file and the reference assembly.  Don't think that's needed any more. Ching-Ho has a way to get ~34 Dsim seqs.
 
 Figure out a more efficient way to extract D. mel alignments from the Popfly server
+
+# Methods
+
+(still a rough outline right now - just collecting notes as I see them)
+
+Assumptions:  
+- stop codons cannot occur.
+
+## counting non-synonymous and synonymous changes for any pair of codons
+
+There are 61 possible non-stop codons. We look up NS and S for a codon's evolutionary path (beforeCodon -> afterCodon) using the `codon_path` object from Bioperl's [`Bio::MolEvol::CodonModel` module](https://metacpan.org/release/CJFIELDS/BioPerl-1.007000_005/view/Bio/MolEvol/CodonModel.pm).  That object gives the NS and S counts for every one of the 3721 (=61*61) combinations of those 61 non-stop codons. 
+The Bioperl module references "code and work from Alisha Holloway at UC Davis and Corbin Jones at UNC-Chapel Hill. See [Population Genomics: Whole-Genome Analysis of Polymorphism and Divergence in Drosophila simulans] (http://dx.doi.org/http://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.0050310) and (http://www.dpgp.org/)"
+
+That PLoS Biol article states: "For cases in which two alternative codons differed at more than one position, we used the pathway between codons that minimized the number of nonsynonymous substitutions. This is conservative with respect to the alternative hypothesis of adaptive evolution."
+
+I copied `CodonModel.pm` locally (it's in `scripts/codonPaths`), parsed it to obtain a simple data frame using `scripts/codonPaths/getCodonPaths.R` and saved that data.frame as an R object (`scripts/codonPaths/codonPathsFromBioperl.Rdata`).
+
+## dealing with ambiguity: there's not always one 'correct' answer
+
+Sometimes (especially when we polarize changes) there's ambiguity in one or both of the 'beforeCodon' or 'afterCodon' sequences.  Example (where pop1=Dmel, pop2=Dsim and Dyak is the outgroup): 
+
+```
+>Dmel_1
+ACA
+>Dmel_2
+ACA
+>Dsim_1
+ACC
+>Dsim_2
+ACC
+>Dyak
+ACT
+```
+Dmel-Dsim have one synonymous change.   However, in this case, the outgroup has a third allele: it does NOT help us polarize.  So the Dmel-Dsim ancestor could have been ACA or ACC, and the synonymous change could have happened along the Dmel OR the Dsim branch.
+
+We can deal with sites like this with two possible strategies. Let's call them `mean` and `conservative` (and you can choose which to use in the `doMKtest` function using the `combiningApproach` option (the default behavior is `combiningApproach="conservative"`).
+
+or each branch we're looking at, we first tabulate all the possible beforeCodon-afterCodon combinations. 
+
+If we're using the `mean` approach, we simply take the mean of the `ns` counts over all possible combinations, and the mean of the `s` counts.
+
+If we're using the `conservative` approach, we choose the beforeCodon-afterCodon combination that would give the most conservative result.  We first look at combination(s) with the minimum `ns` count, and if there's still >1 combination, we look at the one with the minimum `s` count.  Now we have a unique `ns` and `s` counts. 
+
+(before Dec 7th 2022, my code had an unintended behavior. For situations where >1 codon combination had the minimum `ns` count, I was arbitrarily choosing the counts for the first of those codon combinations. This led to inconsistent results if we flipped the identities of pop1 and pop2, because the codon combinations appeared in a different order. After this change, results SHOULD be symmetrical no matter which population is pop1 and which is pop2.) 
+
+Either way, we do NOT totally ignore codons with ambiguity.
+
+

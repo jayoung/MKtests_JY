@@ -1,5 +1,5 @@
 ### https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test
- 
+
 require(Biostrings)
 source("scripts/MKfunctions_utilities.R")
 source("scripts/MKfunctions_plottingAndExcelOutput.R")
@@ -76,8 +76,8 @@ reconstructAncestor <- function(aln_tables, aln_df, fixed_nucs, seqGroups, ingro
 ####### reconstructAncestor_includeUncertainty: a function to reconstruct ancestors at individual positions (NOT codons), now including uncertainty
 # ingroup is a list like the output of alnSlicesUniqueSeqs for the ingroup we are trying to get ancestor for
 # outgroup(s) is a list of lists, for outgroups in order. We use the first outgroup to resolve uncertainty if possible, if not we try the second, etc
-reconstructAncestor_includeUncertainty <- function(ingroup, outgroups) {
-    #if (length(ingroup[[1]]) != 1) {
+reconstructAncestor_includeUncertainty <- function(ingroup, outgroups,
+                                                   extraVerbose=FALSE) {
     if (nchar(ingroup[[1]][1]) != 1) {
         stop("ERROR - alignment should be split into single nucleotide slices for the reconstructAncestor_includeUncertainty function\n\n")
     }
@@ -86,6 +86,13 @@ reconstructAncestor_includeUncertainty <- function(ingroup, outgroups) {
         ingroupThisPos <- ingroup[[i]]
         if (length(ingroupThisPos)==1) {return(ingroupThisPos)}
         outgroupsThisPos <- lapply(outgroups, "[[", i)
+        if(extraVerbose) {
+            cat("\n            ingroupThisPos:\n")
+            print(ingroupThisPos)
+            cat("\n            outgroupsThisPos:\n")
+            print(outgroupsThisPos)
+            cat("\n")
+        }
         # try each outgroup in turn for a unique solution
         for (outgroupThisPos in outgroupsThisPos) {
             sharedNucs <- intersect(ingroupThisPos,outgroupThisPos)
@@ -96,17 +103,26 @@ reconstructAncestor_includeUncertainty <- function(ingroup, outgroups) {
         # if we still have not worked it out:
         return(ingroupThisPos)
     })
+    if(extraVerbose) {
+        cat("            ancestor:\n")
+        print(ancestor)
+        cat("\n")
+    }
     return(ancestor)
 }
 
 #### get counts of synon and non-synon changes between sets of codons (character vectors)
-getCodonChangeCounts <- function(codonsBefore, codonsAfter, paths=codonPaths) {
+getCodonChangeCounts <- function(codonsBefore, codonsAfter, 
+                                 paths=codonPaths, 
+                                 extraVerbose=FALSE) {
+
     if (length(codonsBefore) != length(codonsAfter)){
         stop("ERROR - codonsBefore and codonsAfter are different lengths\n\n")    
     }
-    #cat("codonsBefore", codonsBefore,"\n")
-    #cat("codonsAfter", codonsAfter,"\n")
-    
+    if (extraVerbose) {
+        cat("codonsBefore", codonsBefore,"\n")
+        cat("codonsAfter", codonsAfter,"\n")
+    }
     ## make sure we have at least one non-stop codon
     outputIfWeFindStopCodons <- data.frame(codon=1:length(codonsBefore), 
                                            before=codonsBefore, 
@@ -126,16 +142,18 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter, paths=codonPaths) {
     
     ## the easy case is identical codons (even if they contain - but if one contains "?" I will NOT call them identical)
     identicalCodons <- which(codonsBefore==codonsAfter & 
-                            !grepl("?", codonsBefore, fixed=TRUE)  & 
-                            !grepl("?", codonsAfter, fixed=TRUE) )
+                                 !grepl("?", codonsBefore, fixed=TRUE)  & 
+                                 !grepl("?", codonsAfter, fixed=TRUE) )
     nsCountsEachCodon[identicalCodons] <- 0
     sCountsEachCodon[identicalCodons] <- 0
     codonsJoined <- paste(codonsBefore, codonsAfter, sep="")
     
     ## codons that differ and are unambiguous, and we can get counts for those
     differentCodons <- which(codonsBefore!=codonsAfter & 
-                            !grepl("[-N\\?]", codonsJoined, perl=TRUE, ignore.case=TRUE))
-    #cat("checking codonsJoined ",codonsJoined,"\n\n")
+                                 !grepl("[-N\\?]", codonsJoined, perl=TRUE, ignore.case=TRUE))
+    if(extraVerbose) {
+        cat("checking codonsJoined ",codonsJoined,"\n\n")
+    }
     # make sure all codons are in the table
     checkCodons <- unique(codonsJoined[differentCodons])
     if (sum(!checkCodons %in% paths[,"path"])>0) {
@@ -168,7 +186,8 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter, paths=codonPaths) {
 #     "conservative" (take the count combination that minimizes ns)
 getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter, 
                                               paths=codonPaths, 
-                                              combiningApproach="conservative") {
+                                              combiningApproach="conservative",
+                                              extraVerbose=FALSE) {
     ### some checks
     if (length(codonListBefore) != length(codonListAfter)){
         stop("\n\nERROR in getCodonChangeCountsFromCodonList - codonListBefore and codonListAfter are different lengths\n\n")    
@@ -194,18 +213,44 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
         beforeAll <- rep( before, length(after))
         afterAll <- rep( after, each=length(before))
         # each possible combination shows up as a row in this result table
-        result <- getCodonChangeCounts(beforeAll,afterAll)
+        results <- getCodonChangeCounts(beforeAll,afterAll, extraVerbose=extraVerbose)
+        if(extraVerbose) {
+            cat("            results BEFORE combining:\n")
+            print(results)
+            cat("\n")
+        }
         # now get a single ns and s considering all possible combinations
         if (combiningApproach=="mean") {
-            ns <- mean(result[,"ns"])
-            s <- mean(result[,"s"])
+            ns <- mean(results[,"ns"])
+            s <- mean(results[,"s"])
         }
+        ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
         if (combiningApproach=="conservative") {
-            mostConservativeRow <- which.min(result[,"ns"])[1]
-            ns <- result[mostConservativeRow,"ns"]
-            s <- result[mostConservativeRow,"s"]
+            ## when there's a tie based on ns I should ALSO minimize s
+            ## take row(s) with minimal ns
+            # I previously used which.min - that always takes the FIRST value matching the minimum value
+            mostConservativeRows <- which(results[,"ns"] == min(results[,"ns"]))
+            results <- results[mostConservativeRows,]
+            if(length(mostConservativeRows)>1) {
+                ## take row(s) with minimal s
+                mostConservativeRows <- which(results[,"s"] == min(results[,"s"]))
+                results <- results[mostConservativeRows,]
+            }
+            # there might still be a tie - I don't care, because all I take is the ns/s counts, which should now have a single value
+            results <- unique(results[,c("ns","s")])
+            if(dim(results)[1]>1) {
+                stop("\n\nERROR - cannot figure out a most conservative solution. code is not working as well as I would expect\n\n")
+            }
+            ns <- results[,"ns"]
+            s <- results[,"s"]
         }
-        return(list(ns=ns, s=s))
+        results <- list(ns=ns, s=s)
+        if(extraVerbose) {
+            cat("            results AFTER combining:\n")
+            print(results)
+            cat("\n")
+        }
+        return(results)
     })
     counts_df <- data.frame(codon=1:numCodons,
                             ns=sapply(counts, "[[", "ns"),
@@ -227,7 +272,8 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
 
 categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert, 
                                                 allelesByNuc, 
-                                                combiningApproach="conservative") {
+                                                combiningApproach="conservative",
+                                                extraVerbose=FALSE) {
     if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
         stop("ERROR - allelesByNuc and ancCodons_withUncert respresent sequences of different lengths\n\n")    
     }
@@ -292,19 +338,55 @@ categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert,
                     }
                 }
             }
-            #cat("beforeCodonsToCheck",beforeCodonsToCheck,"\n")
-            #cat("afterCodonsToCheck",afterCodonsToCheck,"\n")
-            results <- getCodonChangeCounts(beforeCodonsToCheck, afterCodonsToCheck)
+            if(extraVerbose) {
+                cat("beforeCodonsToCheck",beforeCodonsToCheck,"\n")
+                cat("afterCodonsToCheck",afterCodonsToCheck,"\n")
+            }
+            results <- getCodonChangeCounts(beforeCodonsToCheck, afterCodonsToCheck, 
+                                            extraVerbose=extraVerbose )
+            if(extraVerbose) {
+                cat("            results BEFORE combining:\n")
+                print(results)
+                cat("\n")
+            }
             if (combiningApproach=="mean") {
                 ns <- mean(results[,"ns"])
                 s <- mean(results[,"s"])
             }
+            ## xxx THIS
+            # if (combiningApproach=="conservative") {
+            #     mostConservativeRow <- which.min(results[,"ns"])[1]
+            #     ns <- results[mostConservativeRow,"ns"]
+            #     s <- results[mostConservativeRow,"s"]
+            # }
+            # 
+            
+            ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
             if (combiningApproach=="conservative") {
-                mostConservativeRow <- which.min(results[,"ns"])[1]
-                ns <- results[mostConservativeRow,"ns"]
-                s <- results[mostConservativeRow,"s"]
+                ## when there's a tie based on ns I should ALSO minimize s
+                ## take row(s) with minimal ns
+                mostConservativeRows <- which(results[,"ns"] == min(results[,"ns"]))
+                results <- results[mostConservativeRows,]
+                if(length(mostConservativeRows)>1) {
+                    ## take row(s) with minimal s
+                    mostConservativeRows <- which(results[,"s"] == min(results[,"s"]))
+                    results <- results[mostConservativeRows,]
+                }
+                # there might still be a tie - I don't care, because all I take is the ns/s counts, which should now have a single value
+                results <- unique(results[,c("ns","s")])
+                if(dim(results)[1]>1) {
+                    stop("\n\nERROR - cannot figure out a most conservative solution. code is not working as well as I would expect\n\n")
+                }
+                ns <- results[,"ns"]
+                s <- results[,"s"]
             }
+            
             results <- list(ns=ns, s=s)
+            if(extraVerbose) {
+                cat("            results AFTER combining:\n")
+                print(results)
+                cat("\n")
+            }
             changesThisCodon[[j]] <- results
         }
         changesThisCodon_df <- data.frame(Pn=sapply(changesThisCodon, "[[", "ns"), 
@@ -335,8 +417,8 @@ categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert,
 #     "mean" (take mean ns and mean s over all possible combinations) or 
 #     "conservative" (take the count combination that minimizes ns)
 categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert, 
-                                        allelesByNuc, 
-                                        combiningApproach="conservative") {
+                                              allelesByNuc, 
+                                              combiningApproach="conservative") {
     if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
         stop("ERROR - allelesByNuc and ancCodons_withUncert respresent sequences of different lengths\n\n")    
     }
@@ -356,15 +438,15 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
         # arbitrarily take the first allele as the one I will compare the others to, and figure out what the ancestral codon looks like if that allele is present
         firstAllele <- alleles[1]
         ancCodonsFirstAllele <- sapply(ancCodons, function(x, 
-                                                        allele1=firstAllele, 
-                                                        pos=codonPos) {
+                                                           allele1=firstAllele, 
+                                                           pos=codonPos) {
             y <- x
             substring(y,pos,pos) <- allele1
             return(y)
         })
         ## look at the other alleles, compare to first
         remainingAlleles <- alleles[2:length(alleles)]
-
+        
         # inject the first allele, and compare each other allele to that, averaging over possible ancestral codons, but summing over alternative alleles (so for triallelic SNPs I should have a total count of 2 polymorphisms)
         countsByAllele <- lapply(remainingAlleles, function(allele) {
             codonsBefore <- character()
@@ -381,11 +463,32 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
                 ns <- mean(results[,"ns"])
                 s <- mean(results[,"s"])
             }
+            # if (combiningApproach=="conservative") {
+            #     mostConservativeRow <- which.min(results[,"ns"])[1]
+            #     ns <- results[mostConservativeRow,"ns"]
+            #     s <- results[mostConservativeRow,"s"]
+            # }
+
+            ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
             if (combiningApproach=="conservative") {
-                mostConservativeRow <- which.min(results[,"ns"])[1]
-                ns <- results[mostConservativeRow,"ns"]
-                s <- results[mostConservativeRow,"s"]
+                ## when there's a tie based on ns I should ALSO minimize s
+                ## take row(s) with minimal ns
+                mostConservativeRows <- which(results[,"ns"] == min(results[,"ns"]))
+                results <- results[mostConservativeRows,]
+                if(length(mostConservativeRows)>1) {
+                    ## take row(s) with minimal s
+                    mostConservativeRows <- which(results[,"s"] == min(results[,"s"]))
+                    results <- results[mostConservativeRows,]
+                }
+                # there might still be a tie - I don't care, because all I take is the ns/s counts, which should now have a single value
+                results <- unique(results[,c("ns","s")])
+                if(dim(results)[1]>1) {
+                    stop("\n\nERROR - cannot figure out a most conservative solution. code is not working as well as I would expect\n\n")
+                }
+                ns <- results[,"ns"]
+                s <- results[,"s"]
             }
+
             results <- list(ns=ns, s=s)
             return(results)
         })
@@ -482,9 +585,9 @@ categorizePolymorphisms <- function(df, countsTable=aln_tables[["mel"]], species
 # nucDF is a data frame with one row for every position in the alignment
 # codonDF is the output of something like getCodonChangeCounts
 addFixedCountsToNucPositionTable <- function(nucDF, codonDF, 
-            outputColPrefix, 
-            columnsToAdd=c("ns","s"),
-            outputColBaseNames=c("Dn","Ds") ) {
+                                             outputColPrefix, 
+                                             columnsToAdd=c("ns","s"),
+                                             outputColBaseNames=c("Dn","Ds") ) {
     if(sum(!columnsToAdd %in% colnames(codonDF))) {
         stop("ERROR - cannot find all these columns in the codon table:",columnsToAdd,"\n\n")
     }
@@ -504,7 +607,8 @@ addFixedCountsToNucPositionTable <- function(nucDF, codonDF,
 ## mylist is a list, one element per nucleotide position, containing any nucleotide we want to consider at that position
 ## output is a list, one element per codon, containing any codons that could be made from that position
 makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
-                            excludeStopCodons=stopCodons ) {
+                                                   excludeStopCodons=stopCodons,
+                                                   extraVerbose=FALSE) {
     numNT <- length(mylist)
     if (numNT/3 != round(numNT/3)) {
         stop("\n\nERROR - sequence length is not a multiple of three",numNT,"\n")
@@ -532,7 +636,7 @@ makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
         }
         return(allCodonVariants)
     })
-    codons
+    return(codons)
 }
 
 
@@ -608,7 +712,7 @@ doMKtest <- function(myAlnFile=NULL,
                      filterRareAlleles=FALSE, 
                      alleleFreqThreshold=0,
                      writeAncFasta=FALSE, writeMKoutput=FALSE,
-                     quiet=FALSE) {
+                     quiet=FALSE, extraVerbose=FALSE) {
     
     ### some checks
     if(is.null(myAln) & is.null(myAlnFile)) {
@@ -694,17 +798,17 @@ doMKtest <- function(myAlnFile=NULL,
     if (sum(!pop1seqs %in% names(aln))>0) {
         missingSeqs <- setdiff(pop1seqs, names(aln))
         cat("ERROR - there are seqs named in the pop1seqs argument that are not in the alignment file.\nFile=",
-             myAlnFile,
-             "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-             "\nseqs present:", paste(names(aln), collapse=" "), "\n")
+            myAlnFile,
+            "\nmissing seqs:", paste(missingSeqs, collapse=" "),
+            "\nseqs present:", paste(names(aln), collapse=" "), "\n")
         stop()
     }
     if (sum(!pop2seqs %in% names(aln))>0) {
         missingSeqs <- setdiff(pop2seqs, names(aln))
         cat("ERROR - there are seqs named in the pop2seqs argument that are not in the alignment file.\nFile=",
-             myAlnFile,
-             "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-             "\nseqs present:", paste(names(aln), collapse=" "), "\n")
+            myAlnFile,
+            "\nmissing seqs:", paste(missingSeqs, collapse=" "),
+            "\nseqs present:", paste(names(aln), collapse=" "), "\n")
         stop()
     }
     if(!is.null(outgroupSeqs)) {
@@ -716,9 +820,9 @@ doMKtest <- function(myAlnFile=NULL,
         if (sum(!unlist(outgroupSeqs) %in% names(aln))>0) {
             missingSeqs <- setdiff(unlist(outgroupSeqs), names(aln))
             cat("ERROR - there are seqs named in the outgroupSeqs argument that are not in the alignment file.\nFile=",
-                 myAlnFile,
-                 "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-                 "\nseqs present:", paste(names(aln), collapse=" "), "\n")
+                myAlnFile,
+                "\nmissing seqs:", paste(missingSeqs, collapse=" "),
+                "\nseqs present:", paste(names(aln), collapse=" "), "\n")
             stop()
         }
     }
@@ -753,7 +857,6 @@ doMKtest <- function(myAlnFile=NULL,
         testOnlyStops <- length(nonStopOrNcodons)==0
         return(testOnlyStops)
     }))
-    #return(codonsHaveOnlyStopsOrNs) ## xx temp
     if(sum(codonsHaveOnlyStopsOrNs)>0) {
         #cat("!!HERE!!\n")
         ## test for internal stop codons:
@@ -795,14 +898,14 @@ doMKtest <- function(myAlnFile=NULL,
     
     # frequencies (over all non-N bases)
     aln_tables_freq <- lapply( aln_tables, getACGTfreqs )
-
+    
     # for each population, get major and minor alleles and their frequencies, flag alleles below a certain frequency threshold (but I do filtering in a separate step, later)
     cat("    looking at allele frequencies\n")
     aln_tables_majorMinor <- lapply(aln_tables_freq, 
                                     getMinorMajorAlleles, 
                                     flagRareAlleles=flagRareAlleles, 
                                     alleleFreqThreshold=alleleFreqThreshold)
-
+    
     #### split alignment by sequence type
     aln_split <- split(aln, seqClassesInAlnOrder)
     
@@ -832,7 +935,7 @@ doMKtest <- function(myAlnFile=NULL,
             alnSlicesUniqueSeqs(x)
         })
     }
-
+    
     #### get each extant nucleotide in each group
     aln_split_PositionsUnique <- lapply(aln_split, function(x) {
         alnSlicesUniqueSeqs(x, sliceWidth=1)
@@ -840,12 +943,12 @@ doMKtest <- function(myAlnFile=NULL,
     aln_split_PositionsUnique_withoutNsGaps <- lapply(aln_split_PositionsUnique, function(x) {
         lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
     })
-
+    
     if(!is.null(outgroupSeqs)) {
         outgroups_aln_split_PositionsUnique <- lapply(outgroups_aln_split, 
                                                       function(x) {
-            alnSlicesUniqueSeqs(x, sliceWidth=1)
-        })
+                                                          alnSlicesUniqueSeqs(x, sliceWidth=1)
+                                                      })
     }
     
     #### infer ancestors (including uncertainty)
@@ -861,16 +964,21 @@ doMKtest <- function(myAlnFile=NULL,
     if (!is.null(outgroupSeqs)) {
         outgroupsForPop2 <- c(outgroupsForPop2, outgroups_aln_split_PositionsUnique)
     }
-    
+    if(extraVerbose) {cat("        pop1\n")}
     pop1_anc_withUncert <- reconstructAncestor_includeUncertainty(
         ingroup=aln_split_PositionsUnique[["pop1"]], 
-        outgroups=outgroupsForPop1 )
-    pop1_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop1_anc_withUncert)
+        outgroups=outgroupsForPop1,
+        extraVerbose=extraVerbose )
+    pop1_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop1_anc_withUncert,
+                                                                         extraVerbose=extraVerbose)
     
+    if(extraVerbose) {cat("        pop2\n")}
     pop2_anc_withUncert <- reconstructAncestor_includeUncertainty(
         ingroup=aln_split_PositionsUnique[["pop2"]], 
-        outgroups=outgroupsForPop2 )
-    pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop2_anc_withUncert)
+        outgroups=outgroupsForPop2,
+        extraVerbose=extraVerbose )
+    pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop2_anc_withUncert,
+                                                                         extraVerbose=extraVerbose)
     
     ### if we are polarizing, get the ancestor to pop1 and pop2 using outgroups
     if (polarize) {
@@ -878,10 +986,22 @@ doMKtest <- function(myAlnFile=NULL,
         pop1_and_pop2_ancs <- lapply(1:numNT, function(i) {
             unique(c(pop1_anc_withUncert[[i]], pop2_anc_withUncert[[i]]))
         })
+        if(extraVerbose) {cat("        pop1and2\n")}
         pop1_and_pop2_anc_withUncert <- reconstructAncestor_includeUncertainty(
             ingroup=pop1_and_pop2_ancs, 
-            outgroups=list(aln_split_PositionsUnique[["out"]]) )
-        pop1_and_pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop1_and_pop2_anc_withUncert)
+            outgroups=list(aln_split_PositionsUnique[["out"]]),
+            extraVerbose=extraVerbose)
+        pop1_and_pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(
+            pop1_and_pop2_anc_withUncert,
+            extraVerbose=extraVerbose)
+        if(extraVerbose) {
+            cat("pop1_and_pop2_anc_withUncert:\n")
+            print(pop1_and_pop2_anc_withUncert)
+            cat("\n")
+            cat("pop1_and_pop2_anc_withUncert_codons:\n")
+            print(pop1_and_pop2_anc_withUncert_codons)
+            cat("\n")
+        }
     }
     
     #### add inferred ancestors to the alignment and write it out
@@ -901,16 +1021,16 @@ doMKtest <- function(myAlnFile=NULL,
     #### make a table showing what's going on with each alignment position
     cat("    starting output table\n")
     positionTable <- data.frame(pos=1:numNT, 
-                codon=rep(1:numCodons, each=3),
-                codon_pos=rep(1:3,numCodons),
-                pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
-                #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
-                pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)!=1,
-                pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
-                pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
-                #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
-                pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)!=1,
-                pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
+                                codon=rep(1:numCodons, each=3),
+                                codon_pos=rep(1:3,numCodons),
+                                pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
+                                #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
+                                pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)!=1,
+                                pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
+                                pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
+                                #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
+                                pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)!=1,
+                                pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
     positionTable[,"fixed_difference"] <- positionTable[,"pop1_anc"] != positionTable[,"pop2_anc"] # not quite want I want, probably ?
     
     if(polarize) { 
@@ -946,7 +1066,8 @@ doMKtest <- function(myAlnFile=NULL,
     pop1_vs_pop2fixedCounts <- getCodonChangeCountsFromCodonList(
         pop1_anc_withUncert_codons, 
         pop2_anc_withUncert_codons, 
-        combiningApproach=combiningApproach)
+        combiningApproach=combiningApproach, 
+        extraVerbose=extraVerbose)
     positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                       pop1_vs_pop2fixedCounts,
                                                       outputColPrefix="pop1_vs_pop2")
@@ -954,33 +1075,51 @@ doMKtest <- function(myAlnFile=NULL,
     ### categorizes the (pop1) polymorphisms, adding pop1_Pn and pop1_Ps to positionTable
     cat("    categorizing polymorphisms\n")
     pop1_polyCounts <- categorizePolymorphisms_new_byCodon(pop1_anc_withUncert_codons, 
-                                                  aln_split_PositionsUnique[["pop1"]],
-                                                  combiningApproach=combiningApproach)
+                                                           aln_split_PositionsUnique[["pop1"]],
+                                                           combiningApproach=combiningApproach,
+                                                           extraVerbose = extraVerbose)
     colnames(pop1_polyCounts) <- paste("pop1", colnames(pop1_polyCounts), sep="_")
     positionTable <- cbind(positionTable, pop1_polyCounts)
     
     pop2_polyCounts <- categorizePolymorphisms_new_byCodon(pop2_anc_withUncert_codons, 
-                                                  aln_split_PositionsUnique[["pop2"]],
-                                                  combiningApproach=combiningApproach)
+                                                           aln_split_PositionsUnique[["pop2"]],
+                                                           combiningApproach=combiningApproach,
+                                                           extraVerbose = extraVerbose)
     colnames(pop2_polyCounts) <- paste("pop2", colnames(pop2_polyCounts), sep="_")
     positionTable <- cbind(positionTable, pop2_polyCounts)
     
     if (polarize) {
         #### polarized, pop1 branch:
-        cat("    getting polarized changes\n")
+        cat("    getting polarized changes\n\n")
+        if(extraVerbose) {
+            cat("getting pop1_and_pop2_anc_to_pop1_FixedCounts:\n")
+        }
         pop1_and_pop2_anc_to_pop1_FixedCounts <- getCodonChangeCountsFromCodonList(
             pop1_and_pop2_anc_withUncert_codons,
             pop1_anc_withUncert_codons, 
-            combiningApproach=combiningApproach)
+            extraVerbose=extraVerbose)
+        if(extraVerbose) {
+            cat("pop1_and_pop2_anc_to_pop1_FixedCounts:\n")
+            print (pop1_and_pop2_anc_to_pop1_FixedCounts)
+            cat("\n")
+        }
         positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                           pop1_and_pop2_anc_to_pop1_FixedCounts,
                                                           "pop1_polarized")
         
         #### polarized, pop2 branch:
+        if(extraVerbose) {
+            cat("getting pop1_and_pop2_anc_to_pop2_FixedCounts:\n")
+        }
         pop1_and_pop2_anc_to_pop2_FixedCounts <- getCodonChangeCountsFromCodonList(
             pop1_and_pop2_anc_withUncert_codons,
             pop2_anc_withUncert_codons, 
-            combiningApproach=combiningApproach)
+            combiningApproach=combiningApproach, 
+            extraVerbose=extraVerbose)
+        if(extraVerbose) {
+            print (pop1_and_pop2_anc_to_pop2_FixedCounts)
+            cat("\n")
+        }
         positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                           pop1_and_pop2_anc_to_pop2_FixedCounts,
                                                           "pop2_polarized")
