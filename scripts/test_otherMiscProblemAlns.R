@@ -19,7 +19,7 @@ MKresults <- doMKtest(raggedAlnFile,
                       pop2seqs=raggedAlnPopulations[["trachy"]])
 
 
-## what happens with an aln where alignment is not an even multiple of 3 in length?  I already check for that.
+####### what happens with an aln where alignment is not an even multiple of 3 in length?  I already check for that.
 partialCodonAlnFile <- here("test_data/test_otherMiscProblemAlns/test_partialCodonAln.fa")
 
 MKresults <- doMKtest(partialCodonAlnFile, 
@@ -27,7 +27,7 @@ MKresults <- doMKtest(partialCodonAlnFile,
                       pop2seqs=raggedAlnPopulations[["trachy"]])
 
 
-## mixed upper and lower case seqs
+####### mixed upper and lower case seqs
 upperLowerAlnFile <- here("test_data/test_otherMiscProblemAlns/MKTwebsite_testAln_mixUpperLowerCase.fa")
 
 # get IDs of individuals in each population
@@ -39,4 +39,11 @@ upperLowerAlnPopulations <- split(names(upperLowerAln), upperLowerAlnSpecies)
 # test
 MKresults <- doMKtest(upperLowerAlnFile, 
                       pop1seqs=upperLowerAlnPopulations[["pongo"]],
-                      pop2seqs=upperLowerAlnPopulations[["trachy"]])
+                      pop2seqs=upperLowerAlnPopulations[["trachy"]],
+                      polarize = TRUE, outgroupSeqs = list(upperLowerAlnPopulations[["trachy"]]))
+
+
+######### user might accidentally specify populations with names in common. that'll mess things up.
+MKresults <- doMKtest(upperLowerAlnFile, 
+                      pop1seqs=upperLowerAlnPopulations[["pongo"]],
+                      pop2seqs=upperLowerAlnPopulations[["pongo"]])

@@ -765,6 +765,20 @@ doMKtest <- function(myAlnFile=NULL,
     ## make sure everything is upper case
     aln <- BStringSet(toupper(aln))
     
+    
+    ## check population names don't overlap with each other
+    if(length(intersect(pop1seqs, pop2seqs))>0) {
+        overlappingNames <- intersect(pop1seqs, pop2seqs)
+        overlappingNames <- paste(overlappingNames, collapse=" ")
+        stop("\n\nERROR - there are sequence names found in both pop1seqs and pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
+    }
+    if(!is.null(outgroupSeqs)) {
+        outgroupSeqsToTest <- unlist(outgroupSeqs, use.names = FALSE)
+        overlappingNames <- intersect(outgroupSeqsToTest, c(pop1seqs, pop2seqs))
+        overlappingNames <- paste(overlappingNames, collapse=" ")
+        stop("\n\nERROR - there are sequence names found in both outgroupSeqs and pop1seqs/pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
+    }
+    
     if (!is.null(outDir)) {
         if (!dir.exists(outDir)) { 
             # only need to make the output dir if we are going to write either of the output file types
