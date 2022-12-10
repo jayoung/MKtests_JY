@@ -758,11 +758,12 @@ doMKtest <- function(myAlnFile=NULL,
     }
     if(!is.null(myAln)) { aln <- myAln }
     
-    # xxx here I will check that all seqs in the alignment are the same length
+    ## check that all seqs in the alignment are the same length
     if (length(unique(width(aln)))>1) {
         stop("\n\nERROR - your alignment looks bad. Sequences are not all the same length as each other\n\n")
     }
-    
+    ## make sure everything is upper case
+    aln <- BStringSet(toupper(aln))
     
     if (!is.null(outDir)) {
         if (!dir.exists(outDir)) { 
