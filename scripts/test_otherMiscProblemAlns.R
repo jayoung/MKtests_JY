@@ -47,3 +47,30 @@ MKresults <- doMKtest(upperLowerAlnFile,
 MKresults <- doMKtest(upperLowerAlnFile, 
                       pop1seqs=upperLowerAlnPopulations[["pongo"]],
                       pop2seqs=upperLowerAlnPopulations[["pongo"]])
+
+####### unusual - an empty alignment file - I now handle this
+emptyAlnFile <- here("test_data/test_otherMiscProblemAlns/test_emptyAlnFile.fa")
+
+MKresults <- doMKtest(emptyAlnFile, 
+                      pop1seqs=raggedAlnPopulations[["pongo"]],
+                      pop2seqs=raggedAlnPopulations[["trachy"]])
+
+
+######## stop codons fixed in one population but not the other (or in the outgroup)
+stopCodonAllSeqs <- here("test_data/test_otherMiscProblemAlns/MKTwebsite_testAln.fa")
+stopCodonAln1 <- here("test_data/test_otherMiscProblemAlns/test_onePopHasStop.fa")
+stopCodonAln2 <- here("test_data/test_otherMiscProblemAlns/test_outgroupHasStop.fa")
+
+# test
+MKresults <- doMKtest(stopCodonAllSeqs, 
+                      pop1seqs=raggedAlnPopulations[["pongo"]],
+                      pop2seqs=raggedAlnPopulations[["trachy"]])
+
+
+# test
+MKresults <- doMKtest(stopCodonAln1, 
+                      pop1seqs=raggedAlnPopulations[["pongo"]],
+                      pop2seqs=raggedAlnPopulations[["trachy"]])
+
+
+

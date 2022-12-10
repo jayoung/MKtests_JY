@@ -612,6 +612,7 @@ addFixedCountsToNucPositionTable <- function(nucDF, codonDF,
 ## output is a list, one element per codon, containing any codons that could be made from that position
 makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
                                                    excludeStopCodons=stopCodons,
+                                                   populationTag=NULL, # to help track errors
                                                    extraVerbose=FALSE) {
     numNT <- length(mylist)
     if (numNT/3 != round(numNT/3)) {
@@ -634,7 +635,15 @@ makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
             if(length(setdiff(allCodonVariants, excludeStopCodons))==0) {
                 cat("all codons",allCodonVariants,"\n")
                 cat("non-stop codons",setdiff(allCodonVariants, excludeStopCodons),"\n")
-                stop("\n\nERROR in codon ",i," - all codon possibilities are stop codons - that's odd\n\n")
+                errorMsg <- "\n\nERROR"
+                if (!is.null(populationTag)) {
+                    errorMsg <- paste(errorMsg, " in population ", populationTag, sep="")
+                }
+                errorMsg <- paste(errorMsg, 
+                                  ", in codon ",i,
+                                  " - all codon possibilities are stop codons - that's odd\n\n", 
+                                  sep="")
+                stop(errorMsg)
             }
             allCodonVariants <- setdiff(allCodonVariants, excludeStopCodons)
         }
@@ -753,6 +762,10 @@ doMKtest <- function(myAlnFile=NULL,
         outfileStem <- paste(outfileStem, sep=".")
         #### read alignment - I keep it as a BStringSet as I might want to use ? character later
         aln <- readBStringSet(myAlnFile)
+        # check for a weird situation where we try to read in an existing empty file. It does work but gives a 0-length alignment
+        if(length(aln)==0) {
+            stop("\n\nERROR - the alignment file you specified exists but is empty: ",myAlnFile,"\n\n")
+        }
         # take only the first word of the seq names
         names(aln) <- sapply(strsplit(names(aln)," "),"[[",1)
     }
@@ -1003,7 +1016,8 @@ doMKtest <- function(myAlnFile=NULL,
         outgroups=outgroupsForPop1,
         extraVerbose=extraVerbose )
     pop1_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop1_anc_withUncert,
-                                                                         extraVerbose=extraVerbose)
+                                                                         extraVerbose=extraVerbose, 
+                                                                         populationTag="pop1_anc")
     
     if(extraVerbose) {cat("        pop2\n")}
     pop2_anc_withUncert <- reconstructAncestor_includeUncertainty(
@@ -1011,7 +1025,8 @@ doMKtest <- function(myAlnFile=NULL,
         outgroups=outgroupsForPop2,
         extraVerbose=extraVerbose )
     pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop2_anc_withUncert,
-                                                                         extraVerbose=extraVerbose)
+                                                                         extraVerbose=extraVerbose, 
+                                                                         populationTag="pop2_anc")
     
     ### if we are polarizing, get the ancestor to pop1 and pop2 using outgroups
     if (polarize) {
@@ -1026,7 +1041,8 @@ doMKtest <- function(myAlnFile=NULL,
             extraVerbose=extraVerbose)
         pop1_and_pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(
             pop1_and_pop2_anc_withUncert,
-            extraVerbose=extraVerbose)
+            extraVerbose=extraVerbose, 
+            populationTag="pop1_and_pop2_anc")
         if(extraVerbose) {
             cat("pop1_and_pop2_anc_withUncert:\n")
             print(pop1_and_pop2_anc_withUncert)
