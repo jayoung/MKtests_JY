@@ -788,8 +788,10 @@ doMKtest <- function(myAlnFile=NULL,
     if(!is.null(outgroupSeqs)) {
         outgroupSeqsToTest <- unlist(outgroupSeqs, use.names = FALSE)
         overlappingNames <- intersect(outgroupSeqsToTest, c(pop1seqs, pop2seqs))
-        overlappingNames <- paste(overlappingNames, collapse=" ")
-        stop("\n\nERROR - there are sequence names found in both outgroupSeqs and pop1seqs/pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
+        if(length(overlappingNames)>0) {
+            overlappingNames <- paste(overlappingNames, collapse=" ")
+            stop("\n\nERROR - there are sequence names found in both outgroupSeqs and pop1seqs/pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
+        }
     }
     
     if (!is.null(outDir)) {

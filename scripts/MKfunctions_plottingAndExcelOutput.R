@@ -25,7 +25,7 @@ addDataAndFormatWorksheet <- function(myWB, df, sheetName,
     columnsContainingCharacter <- list()
     
     for (tempCol in grep("pVal|_NI$|_alpha$",colnames(df2),value=TRUE)) {
-        ## I was previously ALWAYS replacing NA/NaN with "N.A." but that messes up Excel formatting when I want to round all the other values in the column. If I switch the NAs to a text value (NAcharacter) I need to do any rounding manyally
+        ## I was previously ALWAYS replacing NA/NaN with "N.A." but that messes up Excel formatting when I want to round all the other values in the column. If I switch the NAs to a text value (NAcharacter) I need to do any rounding manually
         if (!keepNA) {
             if (roundSomeColumns) {
                 df2[,tempCol] <- round(df2[,tempCol], digits=3)
@@ -55,7 +55,9 @@ addDataAndFormatWorksheet <- function(myWB, df, sheetName,
     }
     
     ## fix up various column names
+    if(extraVerbose) {cat("here1 colnames are now",colnames(df2),"\n")}
     colnames(df2) <- gsub("_"," ", colnames(df2))
+    if(extraVerbose) {cat("here2 colnames are now",colnames(df2),"\n")}
     ## population aliases
     if (!is.null(pop1alias)) { colnames(df2) <- gsub("pop1", pop1alias, colnames(df2)) } 
     if (!is.null(pop2alias)) { colnames(df2) <- gsub("pop2", pop2alias, colnames(df2)) }
@@ -117,7 +119,7 @@ addDataAndFormatWorksheet <- function(myWB, df, sheetName,
         # if we replaced NA values with a text string, Excel gets fussy if we convert to number format, if there were any NAs, but I'm not going to the trouble of testing to see if there were
         if (keepNA) {
             columnsToRound <- grep(" pVal| NI| alpha", colnames(df2))
-            if(extraVerbose) { cat("columnsToRound ",columnsToRound,"\n") }
+            if (extraVerbose) { cat("columnsToRound ",columnsToRound,"\n") }
             if (length(columnsToRound)>0) {
                 addStyle(myWB, sheetName, createStyle(numFmt="0.000"), stack=TRUE, 
                          cols=columnsToRound, 
@@ -137,11 +139,6 @@ addDataAndFormatWorksheet <- function(myWB, df, sheetName,
                      gridExpand=TRUE)
         }
     }
-    
-        # if we did replace any of the NA values with a text string, let's convert the column to a text column to avoid the warnings Excel shows
-        #if (!keepNA) {
-        #    for (tempCol in columnsToRound)
-        #}
     
 }
 
@@ -211,9 +208,53 @@ combineMKresults <- function(MKresultList, outFile=NULL, outDir=NULL,
     if(length(unique(names(MKresultList))) != length(MKresultList) ) {
         stop("\n\nERROR - each item in the results list must have a unique name\n\n")
     }
+    #cat("keepNA is",keepNA,"\n")
     
+    #### if the list has a mix of unpolarized and polarized results, I need to do something more before I can rbind.
+    summaries <- lapply(MKresultList, "[[", "summary")
+    
+    ## first we choose a summary table whose colnames are what we'll aim for in all the other summary tables. which.max arbitrarily chooses the first if there are ties
+    maxNumCols <- which.max(sapply(summaries, ncol))
+    summaryWithMostColumns <- summaries [[ maxNumCols ]]
+    colnamesWeWant <- colnames(summaryWithMostColumns)
+    
+    ## then we make sure each summary table has those columns, in that order. We fill in missing columns with "". We will get weird Excel warnings (number stored as text) but we'll have to ignore that
+    summariesFixed <- lapply(summaries, function(x) {
+        # maybe colnames are already identical and we don't need to do anything
+        if (identical(colnamesWeWant, colnames(x))) {return(x)}
+        
+        # maybe the same colnames exist but we need to reorder them
+        if (identical(sort(colnamesWeWant), sort(colnames(x)))) {
+            x <- x[,colnamesWeWant]
+            return(x)
+        }
+                
+        # maybe there are the same NUMBER of columns but they have different names (I'm not testing explicitly for different names, but the two conditions above should have already picked up situations where the names are the same)
+        if (length(colnamesWeWant) == length(colnames(x))) {
+            stop("\n\nERROR - cannot combine these summary tables, because they have different column names. The code is not (yet?) set up to handle this\n\n")
+        }
+        if (!keepNA & !is.null(outFile)) {
+            stop("\n\nERROR - haven't figured out the correct way to code this situation. We are trying to merge unpolarized and polarized results into a single output file, and we are trying to use the keepNA=FALSE option while exporting to Excel. It's acting weirdly and I haven't done figured out why yet\n")
+        }
+        
+        # maybe some columns are totally missing
+        missingColnames <- setdiff(colnamesWeWant, colnames(x))
+        if (length(missingColnames)>1) {
+            for (missingCol in missingColnames) {
+                x[,missingCol] <- NA
+                #keepNA <<- FALSE  ## special assignment operator so we affect the global variable for the rest of the function
+                ## if we do this, we'll want to mess with the Excel formatting 
+                # keepNA=TRUE, NAcharacter="N.A.",
+            }
+            x <- x[,colnamesWeWant]
+            return(x)
+        }
+    })
+    #cat("keepNA is",keepNA,"\n")
     #### combine results into a single table
-    results_df <- do.call("rbind", lapply(MKresultList, "[[", "summary"))
+    results_df <- do.call("rbind", summariesFixed)
+    
+    if(extraVerbose) { cat("colnames are now", colnames(results_df), "\n") }
     ### some cosmetic stuff - add gene name as its own column
     results_df[,"gene_name"] <- row.names(results_df)
     ## get rini's gene names

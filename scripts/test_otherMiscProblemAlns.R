@@ -74,3 +74,128 @@ MKresults <- doMKtest(stopCodonAln1,
 
 
 
+######## I want to be able to combine polarized and unpolarized results into the same output file
+
+
+risaFiles <- list()
+risaFiles[["popDat_justSim"]] <- here("data/Risa/2022_Dec7/abo_simpop_mel_yak.fasta")
+risaFiles[["popDat_bothSpecies"]] <- here("data/Risa/2022_Dec7/abo_melpop_simpop_yak.fasta")
+
+risa_alns <- lapply(risaFiles, readDNAStringSet)
+
+## set up population names
+risa_popIDs <- list()
+
+risa_popIDs[["popDat_justSim"]] <- list()
+risa_popIDs[["popDat_justSim"]][["sim"]] <- grep("CM015606", names(risa_alns[["popDat_justSim"]]), value=TRUE)
+risa_popIDs[["popDat_justSim"]][["mel"]] <- grep("melanogaster", names(risa_alns[["popDat_justSim"]]), value=TRUE)
+risa_popIDs[["popDat_justSim"]][["yak"]] <- grep("yakuba", names(risa_alns[["popDat_justSim"]]), value=TRUE)
+
+risa_popIDs[["popDat_bothSpecies"]] <- list()
+risa_popIDs[["popDat_bothSpecies"]][["sim"]] <- grep("CM015606|sim", names(risa_alns[["popDat_bothSpecies"]]), value=TRUE)
+risa_popIDs[["popDat_bothSpecies"]][["yak"]] <- grep("yakuba", names(risa_alns[["popDat_bothSpecies"]]), value=TRUE)
+## mel is everything else:
+risa_popIDs[["popDat_bothSpecies"]][["mel"]] <- setdiff(names(risa_alns[["popDat_bothSpecies"]]), 
+                                                        c(risa_popIDs[["popDat_bothSpecies"]][["sim"]],
+                                                          risa_popIDs[["popDat_bothSpecies"]][["yak"]])) 
+## sanity check
+# lapply(risa_popIDs, function(x) { sapply(x, length)})
+
+## MK tests
+risa_MKresults <- list()
+
+## popDat_justSim
+risa_MKresults[["popDat_justSim_unpolarizedA"]] <- doMKtest(
+    risaFiles[["popDat_justSim"]], 
+    pop1seqs=risa_popIDs[["popDat_justSim"]][["sim"]], pop1alias="sim",
+    pop2seqs=risa_popIDs[["popDat_justSim"]][["mel"]], pop2alias="mel")
+
+risa_MKresults[["popDat_justSim_unpolarizedB"]] <- doMKtest(
+    risaFiles[["popDat_justSim"]], 
+    pop1seqs=risa_popIDs[["popDat_justSim"]][["mel"]], pop1alias="mel",
+    pop2seqs=risa_popIDs[["popDat_justSim"]][["sim"]], pop2alias="sim")
+
+risa_MKresults[["popDat_justSim_polarizedA"]] <- doMKtest(
+    risaFiles[["popDat_justSim"]], 
+    pop1seqs=risa_popIDs[["popDat_justSim"]][["sim"]], pop1alias="sim",
+    pop2seqs=risa_popIDs[["popDat_justSim"]][["mel"]], pop2alias="mel",
+    polarize=TRUE, 
+    outgroupSeqs = list(risa_popIDs[["popDat_justSim"]][["yak"]]))
+
+risa_MKresults[["popDat_justSim_polarizedB"]] <- doMKtest(
+    risaFiles[["popDat_justSim"]], 
+    pop1seqs=risa_popIDs[["popDat_justSim"]][["mel"]], pop1alias="mel",
+    pop2seqs=risa_popIDs[["popDat_justSim"]][["sim"]], pop2alias="sim",
+    polarize=TRUE, 
+    outgroupSeqs = list(risa_popIDs[["popDat_justSim"]][["yak"]]))
+
+
+## popDat_bothSpecies
+risa_MKresults[["popDat_bothSpecies_unpolarizedA"]] <- doMKtest(
+    risaFiles[["popDat_bothSpecies"]], 
+    pop1seqs=risa_popIDs[["popDat_bothSpecies"]][["sim"]], pop1alias="sim",
+    pop2seqs=risa_popIDs[["popDat_bothSpecies"]][["mel"]], pop2alias="mel")
+
+risa_MKresults[["popDat_bothSpecies_unpolarizedB"]] <- doMKtest(
+    risaFiles[["popDat_bothSpecies"]], 
+    pop1seqs=risa_popIDs[["popDat_bothSpecies"]][["mel"]], pop1alias="mel",
+    pop2seqs=risa_popIDs[["popDat_bothSpecies"]][["sim"]], pop2alias="sim")
+
+risa_MKresults[["popDat_bothSpecies_polarizedA"]] <- doMKtest(
+    risaFiles[["popDat_bothSpecies"]], 
+    pop1seqs=risa_popIDs[["popDat_bothSpecies"]][["sim"]], pop1alias="sim",
+    pop2seqs=risa_popIDs[["popDat_bothSpecies"]][["mel"]], pop2alias="mel",
+    polarize=TRUE, 
+    outgroupSeqs = list(risa_popIDs[["popDat_bothSpecies"]][["yak"]]))
+
+risa_MKresults[["popDat_bothSpecies_polarizedB"]] <- doMKtest(
+    risaFiles[["popDat_bothSpecies"]], 
+    pop1seqs=risa_popIDs[["popDat_bothSpecies"]][["mel"]], pop1alias="mel",
+    pop2seqs=risa_popIDs[["popDat_bothSpecies"]][["sim"]], pop2alias="sim",
+    polarize=TRUE, 
+    outgroupSeqs = list(risa_popIDs[["popDat_bothSpecies"]][["yak"]]))
+
+
+## combine and save to Excel files
+
+## without excel file
+risa_MKresults_unpolarized <- combineMKresults(risa_MKresults[ grep("_unpolarized", names(risa_MKresults)) ])
+risa_MKresults_polarized <- combineMKresults(risa_MKresults[ grep("_polarized", names(risa_MKresults)) ])
+
+
+### with excel file
+risa_MKresults_unpolarized <- combineMKresults(risa_MKresults[ grep("_unpolarized", names(risa_MKresults)) ],
+                                               outFile="risa_MKresults_unpolarized_v1.xlsx",
+                                               outDir=here("test_data/test_otherMiscProblemAlns"))
+### with excel file keepNA=FALSE, NAcharacter="", 
+risa_MKresults_unpolarized <- combineMKresults(risa_MKresults[ grep("_unpolarized", names(risa_MKresults)) ],
+                                               outFile="risa_MKresults_unpolarized_v2.xlsx",
+                                               outDir=here("test_data/test_otherMiscProblemAlns"),
+                                               keepNA=FALSE, NAcharacter="")
+
+
+risa_MKresults_all <- combineMKresults(risa_MKresults, extraVerbose=TRUE)
+                                   
+risa_MKresults_all <- combineMKresults(risa_MKresults, 
+                                       outFile="risa_MKresults_all.xlsx",
+                                       outDir=here("test_data/test_otherMiscProblemAlns"), 
+                                       extraVerbose=TRUE)
+
+
+### weird - ALL OF the column headers are blank with this:
+risa_MKresults_all_2 <- combineMKresults(risa_MKresults, 
+                                       outFile="risa_MKresults_all_v2.xlsx",
+                                       outDir=here("test_data/test_otherMiscProblemAlns"),
+                                       keepNA=FALSE, NAcharacter="", 
+                                       extraVerbose=TRUE)
+
+### weird - ALL OF the column headers are are blank using this:
+risa_MKresults_all_3 <- combineMKresults(risa_MKresults, 
+                                         outFile="risa_MKresults_all_v3.xlsx",
+                                         outDir=here("test_data/test_otherMiscProblemAlns"),
+                                         keepNA=FALSE, NAcharacter="N.A.", 
+                                         extraVerbose=TRUE)
+
+
+
+
