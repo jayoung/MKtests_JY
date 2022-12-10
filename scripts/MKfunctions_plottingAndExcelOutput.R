@@ -188,20 +188,22 @@ writeOneMKtestToExcel <- function(finalOutputTable, positionTable,
 }
     
 ### combineMKresults: takes MK results from several alignments and makes a single output file / table
-combineMKresults <- function(MKresultList, outFile, outDir=NULL, 
+combineMKresults <- function(MKresultList, outFile=NULL, outDir=NULL, 
                              keepNA=TRUE, NAcharacter="N.A.",
                              pop1alias=NULL, pop2alias=NULL,
                              getGeneNames=FALSE, geneNameFile="riniTable2_geneOrder.txt", 
                              rowBordersEachGene=FALSE,
                              roundSomeColumns=TRUE,
                              extraVerbose=FALSE) {
-    require(openxlsx)
-    #### check outDir is present
-    if(!is.null(outDir)) {
-        if (!dir.exists(outDir)) { dir.create(outDir) }
-        outFile <- paste(outDir,outFile,sep="/")
+    ## once in a while I want to combine but NOT save an excel file
+    if(!is.null(outFile)) {
+        require(openxlsx)
+        #### check outDir is present
+        if(!is.null(outDir)) {
+            if (!dir.exists(outDir)) { dir.create(outDir) }
+            outFile <- paste(outDir,outFile,sep="/")
+        }
     }
-    
     #### check they have names
     if(is.null(names(MKresultList))) {
         stop("\n\nERROR - the results list must have names\n\n")
@@ -232,6 +234,11 @@ combineMKresults <- function(MKresultList, outFile, outDir=NULL,
         newColOrder <- c("gene_name")
         newColOrder <- c( newColOrder, setdiff( colnames(results_df) , newColOrder))
         results_df <- results_df[,newColOrder]
+    }
+    
+    ### maybe I don't want the Excel file:
+    if(is.null(outFile)) {
+        return(results_df)
     }
     
     ####### save output to excel file

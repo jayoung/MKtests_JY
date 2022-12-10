@@ -74,6 +74,7 @@ reconstructAncestor <- function(aln_tables, aln_df, fixed_nucs, seqGroups, ingro
 
 
 ####### reconstructAncestor_includeUncertainty: a function to reconstruct ancestors at individual positions (NOT codons), now including uncertainty
+## uncertainty is only regarding ambiguous reconstructions. If any of the extant sequences have N we ignore the N
 # ingroup is a list like the output of alnSlicesUniqueSeqs for the ingroup we are trying to get ancestor for
 # outgroup(s) is a list of lists, for outgroups in order. We use the first outgroup to resolve uncertainty if possible, if not we try the second, etc
 reconstructAncestor_includeUncertainty <- function(ingroup, outgroups,
@@ -192,8 +193,8 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
     if (length(codonListBefore) != length(codonListAfter)){
         stop("\n\nERROR in getCodonChangeCountsFromCodonList - codonListBefore and codonListAfter are different lengths\n\n")    
     }
-    if (!combiningApproach %in% c("mean","conservative") ) {
-        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative\n\n")
+    if (!combiningApproach %in% c("mean","conservative","conservativeOld") ) {
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative or conservativeOld\n\n")
     }
     
     if(sum(stopCodons %in% codonListBefore) > 0) {
@@ -225,6 +226,11 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
             s <- mean(results[,"s"])
         }
         ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
+        if (combiningApproach=="conservativeOld") {
+            mostConservativeRow <- which.min(results[,"ns"])[1]
+            ns <- results[mostConservativeRow,"ns"]
+            s <- results[mostConservativeRow,"s"]
+        }
         if (combiningApproach=="conservative") {
             ## when there's a tie based on ns I should ALSO minimize s
             ## take row(s) with minimal ns
@@ -252,6 +258,7 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
         }
         return(results)
     })
+    
     counts_df <- data.frame(codon=1:numCodons,
                             ns=sapply(counts, "[[", "ns"),
                             s=sapply(counts, "[[", "s"))
@@ -277,8 +284,8 @@ categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert,
     if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
         stop("ERROR - allelesByNuc and ancCodons_withUncert respresent sequences of different lengths\n\n")    
     }
-    if (!combiningApproach %in% c("mean","conservative") ) {
-        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative\n\n")
+    if (!combiningApproach %in% c("mean","conservative","conservativeOld") ) {
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative or conservativeOld\n\n")
     }
     
     #### work on each codon at a time
@@ -353,15 +360,12 @@ categorizePolymorphisms_new_byCodon <- function(ancCodons_withUncert,
                 ns <- mean(results[,"ns"])
                 s <- mean(results[,"s"])
             }
-            ## xxx THIS
-            # if (combiningApproach=="conservative") {
-            #     mostConservativeRow <- which.min(results[,"ns"])[1]
-            #     ns <- results[mostConservativeRow,"ns"]
-            #     s <- results[mostConservativeRow,"s"]
-            # }
-            # 
-            
             ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
+            if (combiningApproach=="conservativeOld") {
+                mostConservativeRow <- which.min(results[,"ns"])[1]
+                ns <- results[mostConservativeRow,"ns"]
+                s <- results[mostConservativeRow,"s"]
+            }
             if (combiningApproach=="conservative") {
                 ## when there's a tie based on ns I should ALSO minimize s
                 ## take row(s) with minimal ns
@@ -422,8 +426,8 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
     if (length(allelesByNuc)/3 != length(ancCodons_withUncert)) {
         stop("ERROR - allelesByNuc and ancCodons_withUncert respresent sequences of different lengths\n\n")    
     }
-    if (!combiningApproach %in% c("mean","conservative") ) {
-        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative\n\n")
+    if (!combiningApproach %in% c("mean","conservative","conservativeOld") ) {
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative or conservativeOld\n\n")
     }
     codonsToTake <- rep( 1:length(ancCodons_withUncert), each=3)
     codonPositions <- rep( 1:3, length(ancCodons_withUncert))
@@ -463,13 +467,13 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
                 ns <- mean(results[,"ns"])
                 s <- mean(results[,"s"])
             }
-            # if (combiningApproach=="conservative") {
-            #     mostConservativeRow <- which.min(results[,"ns"])[1]
-            #     ns <- results[mostConservativeRow,"ns"]
-            #     s <- results[mostConservativeRow,"s"]
-            # }
 
             ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
+            if (combiningApproach=="conservativeOld") {
+                mostConservativeRow <- which.min(results[,"ns"])[1]
+                ns <- results[mostConservativeRow,"ns"]
+                s <- results[mostConservativeRow,"s"]
+            }
             if (combiningApproach=="conservative") {
                 ## when there's a tie based on ns I should ALSO minimize s
                 ## take row(s) with minimal ns
@@ -634,6 +638,10 @@ makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
             }
             allCodonVariants <- setdiff(allCodonVariants, excludeStopCodons)
         }
+        # xxx get rid of any that contain N (added this Dec 9 2022)
+        # maybe I should be excluding N even before I get to this step
+        allCodonVariants <- grep("N", allCodonVariants, invert=TRUE, value=TRUE)
+        
         return(allCodonVariants)
     })
     return(codons)
@@ -732,8 +740,8 @@ doMKtest <- function(myAlnFile=NULL,
             stop("\n\nERROR - when using the doMKtests function on a BStringSet object, must also specify the outfileStem argument\n\n")
         }
     }
-    if (!combiningApproach %in% c("mean","conservative") ) {
-        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative\n\n")
+    if (!combiningApproach %in% c("mean","conservative","conservativeOld") ) {
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - the combiningApproach option can only be mean or conservative or conservativeOld\n\n")
     }
     
     ### read in alignment (if we're using myAlnFile), figure out output file names
@@ -924,9 +932,13 @@ doMKtest <- function(myAlnFile=NULL,
         #return(aln_split)
         aln_split <- BStringSetList(aln_split)
     }
+    
+    
+    #### moving on...
     aln_split["pop1_and_pop2"] <- BStringSetList(c(aln_split[["pop1"]], aln_split[["pop2"]]))
     
     #### get each extant codon in each group
+    ## after Dec 9 2022, we remove N-containing codons from the returned codons (I changed alnSlicesUniqueSeqs function)
     aln_split_codonsUnique <- lapply(aln_split, function(x) {
         alnSlicesUniqueSeqs(x)
     })
@@ -1068,6 +1080,7 @@ doMKtest <- function(myAlnFile=NULL,
         pop2_anc_withUncert_codons, 
         combiningApproach=combiningApproach, 
         extraVerbose=extraVerbose)
+
     positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                       pop1_vs_pop2fixedCounts,
                                                       outputColPrefix="pop1_vs_pop2")

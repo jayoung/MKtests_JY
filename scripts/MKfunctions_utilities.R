@@ -36,12 +36,21 @@ makeCodons <- function( thisSeq ) {
 #### alnSlicesUniqueSeqs - a function to take an alignment, split it into codons, and for each codon, return a character vector of the diversity of observed codons at that position
 # input = an alignment as BStringSet
 # output = a list, one element per codon, character vector of what codons are present
-alnSlicesUniqueSeqs <- function(myAln, sliceWidth=3) {
+# ignoreCodonsWithNs = TRUE (or FALSE) - do we want to eliminate codons that contain 1 or more Ns. Added this option Dec 9 2022.  I didn't need this when I was using which.min, because which.min ignores NA by default.
+alnSlicesUniqueSeqs <- function(myAln, sliceWidth=3, ignoreCodonsWithNs=TRUE) {
     numSlices <- width(myAln)[1] / sliceWidth
     sliceStarts <- 1 + sliceWidth*((1:numSlices)-1)
     sliceEnds <- sliceStarts + sliceWidth - 1
     slices <- lapply( 1:numSlices, function(i) {
         slice <- subseq(myAln, start=sliceStarts[i], end=sliceEnds[i])
+        
+        if (ignoreCodonsWithNs) {
+            sliceInclN <- slice
+            slice <- grep("N", slice, invert=TRUE, value=TRUE)
+            if(length(slice)==0){
+                stop("\n\nThere were NO non-N codons at codon position",i,". Before removing N-containing codons, this is what we saw:",sliceInclN,"\n\n")
+            }
+        }
         return(unique(as.character(slice)))
     })
     return(slices)
