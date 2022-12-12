@@ -837,7 +837,6 @@ doMKtest <- function(myAlnFile=NULL,
     }
     
     cat("    splitting alignment into groups and tabulating nucleotides\n")
-    
     #### check that all pop1 and pop2 seqs are in the alignment (and possibly outgroups)
     if (sum(!pop1seqs %in% names(aln))>0) {
         missingSeqs <- setdiff(pop1seqs, names(aln))
@@ -968,7 +967,6 @@ doMKtest <- function(myAlnFile=NULL,
         #return(aln_split)
         aln_split <- BStringSetList(aln_split)
     }
-    
     
     #### moving on...
     aln_split["pop1_and_pop2"] <- BStringSetList(c(aln_split[["pop1"]], aln_split[["pop2"]]))
@@ -1198,7 +1196,12 @@ doMKtest <- function(myAlnFile=NULL,
                                     num_seqs_outgroup=length(unlist(outgroupSeqs)),
                                     seqs_not_used=seqs_not_used,
                                     length_NT=numNT,
-                                    length_AA=numCodons)
+                                    length_AA=numCodons,
+                                    filter_rare_alleles=filterRareAlleles,
+                                    rare_allele_freq_threshold=alleleFreqThreshold,
+                                    parameter_combining_approach=combiningApproach)
+ 
+    ## a tiny bit of help to see what's in each population
     if(!is.null(outgroupSeqs)) {
         finalOutputTable[,"outgroup"] <- unlist(outgroupSeqs)
     }

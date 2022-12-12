@@ -106,9 +106,10 @@ risa_popIDs[["popDat_bothSpecies"]] <- list()
 risa_popIDs[["popDat_bothSpecies"]][["sim"]] <- grep("CM015606|sim", names(risa_alns[["popDat_bothSpecies"]]), value=TRUE)
 risa_popIDs[["popDat_bothSpecies"]][["yak"]] <- grep("yakuba", names(risa_alns[["popDat_bothSpecies"]]), value=TRUE)
 ## mel is everything else:
-risa_popIDs[["popDat_bothSpecies"]][["mel"]] <- setdiff(names(risa_alns[["popDat_bothSpecies"]]), 
-                                                        c(risa_popIDs[["popDat_bothSpecies"]][["sim"]],
-                                                          risa_popIDs[["popDat_bothSpecies"]][["yak"]])) 
+risa_popIDs[["popDat_bothSpecies"]][["mel"]] <- setdiff(
+    names(risa_alns[["popDat_bothSpecies"]]), 
+    c(risa_popIDs[["popDat_bothSpecies"]][["sim"]],
+      risa_popIDs[["popDat_bothSpecies"]][["yak"]])) 
 ## sanity check
 # lapply(risa_popIDs, function(x) { sapply(x, length)})
 
@@ -167,18 +168,34 @@ risa_MKresults[["popDat_bothSpecies_polarizedB"]] <- doMKtest(
     outgroupSeqs = list(risa_popIDs[["popDat_bothSpecies"]][["yak"]]))
 
 
+risa_MKresults[["popDat_bothSpec_polB_noRare"]] <- doMKtest(
+    risaFiles[["popDat_bothSpecies"]], 
+    pop1seqs=risa_popIDs[["popDat_bothSpecies"]][["mel"]], pop1alias="mel",
+    pop2seqs=risa_popIDs[["popDat_bothSpecies"]][["sim"]], pop2alias="sim",
+    polarize=TRUE, 
+    outgroupSeqs = list(risa_popIDs[["popDat_bothSpecies"]][["yak"]]),
+    filterRareAlleles = TRUE, alleleFreqThreshold=0.05)
+
+
+
 ## combine and save to Excel files
+# just unpolarized
 risa_MKresults_unpolarized <- combineMKresults(risa_MKresults[ grep("_unpolarized", names(risa_MKresults)) ], 
                                                outFile="risa_MKresults_unpolarized.xlsx",
                                                outDir=here("data/Risa/2022_Dec7"),
                                                getGeneNames=FALSE)
-
+# just polarized
 risa_MKresults_polarized <- combineMKresults(risa_MKresults[ grep("_polarized", names(risa_MKresults)) ], 
                                              outFile="risa_MKresults_polarized.xlsx",
                                              outDir=here("data/Risa/2022_Dec7"),
                                              getGeneNames=FALSE, 
                                              keepNA=FALSE, NAcharacter="")
 
+# all of them together
+risa_MKresults_all <- combineMKresults(risa_MKresults, 
+                                       outFile="risa_MKresults_all_addColumns.xlsx",
+                                       outDir=here("data/Risa/2022_Dec7"),
+                                       getGeneNames=FALSE)
 
 ### sanity check:  now, after fixing code:
 # - results are symmetrical, no matter which population is pop1 and which is pop2
