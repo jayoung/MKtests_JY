@@ -9,6 +9,13 @@ colsForVerticalBorderPositionTables <- c("pop1_anc", "pop1_A", "pop2_A",
                                          "pop1_vs_pop2_Dn", "pop1_polarized_Dn", "total_polarized_Dn")
 
 
+### codonPosToNucs - a tiny function to a codon position to its nucleotide positions (start and end)
+codonPosToNucs <- function(codonPos) {
+    codonStartPos <- 3*(codonPos - 1) + 1
+    codonEndPos <- codonStartPos + 2
+    return(list(start=codonStartPos, end=codonEndPos))
+}
+
 ### makeCodons is a simple function to take a character vector, where each element is a single nucleotide, and return strings of each codon (so output vector will be 1/3 the length)
 # thisSeq is a character vector
 makeCodons <- function( thisSeq ) {

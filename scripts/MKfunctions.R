@@ -718,6 +718,7 @@ filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
 #        use <= to mimic MKT website
 # alleleFreqThreshold: used by flagRareAlleles
 # writeAncFasta and writeMKoutput - will I write output files for each individual alignment, or will I wait until I combine output from several alignments (=default) 
+# regionStartAA / regionEndAA (default=NULL) - can specify a codon position to start and end the analysis at
 doMKtest <- function(myAlnFile=NULL, 
                      myAln=NULL, outfileStem=NULL,
                      outDir=NULL, 
@@ -725,9 +726,8 @@ doMKtest <- function(myAlnFile=NULL,
                      pop1alias=NULL, pop2alias=NULL,
                      polarize=FALSE, outgroupSeqs=NULL,
                      combiningApproach="conservative", 
-                     flagRareAlleles=FALSE, 
-                     filterRareAlleles=FALSE, 
-                     alleleFreqThreshold=0,
+                     filterRareAlleles=FALSE, flagRareAlleles=FALSE, alleleFreqThreshold=0,
+                     regionStartAA=NULL, regionEndAA=NULL,
                      writeAncFasta=FALSE, writeMKoutput=FALSE,
                      quiet=FALSE, extraVerbose=FALSE) {
     
@@ -778,6 +778,29 @@ doMKtest <- function(myAlnFile=NULL,
     ## make sure everything is upper case
     aln <- BStringSet(toupper(aln))
     
+    ## possibly trim
+    codonOffsetForOutput <- 0
+    nucleotideOffsetForOutput <- 0
+    
+    # for the output file:
+    regionStartAAforOutput <- 1
+    regionEndAAforOutput <- width(aln)[1]/3
+    if(!is.null(regionStartAA)) { regionStartAAforOutput <- regionStartAA }
+    if(!is.null(regionEndAA)) { regionEndAAforOutput <- regionEndAA }
+    
+    if(!is.null(regionStartAA) || !is.null(regionEndAA)) {
+        # get trim positions in nucleotides. We might not have specified BOTH regionStartAA and regionEndAA, so fill in what's missing
+        if (is.null(regionStartAA)) { regionStartAA <- 1 }
+        if (is.null(regionEndAA)) { regionEndAA <- width(aln)[1]/3 }
+        # convert from codon pos to nucleotide pos
+        regionStartAA_nuc <- codonPosToNucs(regionStartAA)[["start"]]
+        regionEndAA_nuc <- codonPosToNucs(regionEndAA)[["end"]]
+        # actually trim alignment
+        aln <- narrow(aln, regionStartAA_nuc, regionEndAA_nuc)
+        # remember how much we need to add to coordinates in the position output table
+        codonOffsetForOutput <- regionStartAA - 1
+        nucleotideOffsetForOutput <- regionStartAA_nuc - 1
+    }
     
     ## check population names don't overlap with each other
     if(length(intersect(pop1seqs, pop2seqs))>0) {
@@ -791,6 +814,11 @@ doMKtest <- function(myAlnFile=NULL,
         if(length(overlappingNames)>0) {
             overlappingNames <- paste(overlappingNames, collapse=" ")
             stop("\n\nERROR - there are sequence names found in both outgroupSeqs and pop1seqs/pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
+        }
+        
+        ## we're also expecting outgroup seqs to be a list (to allow hierarchy of outgroups) but maybe the user wanted to keep it simple and specify just a character vector:
+        if (class(outgroupSeqs)=="character") {
+            outgroupSeqs <- list(outgroup1=outgroupSeqs)
         }
     }
     
@@ -878,7 +906,7 @@ doMKtest <- function(myAlnFile=NULL,
         stop("ERROR - there are one or more repeated names in the pop2seqs argument\n\n")    
     }
     if (length(unlist(outgroupSeqs)) != length(unique(unlist(outgroupSeqs)))) {
-        stop("ERROR - there are one or more repeated names in the outgroupSeqs argument\n\n")    
+        stop("ERROR - there are one or more repeated names in the outgroupSeqs argument\n\n")
     }
     
     #### reorder alignment
@@ -888,11 +916,9 @@ doMKtest <- function(myAlnFile=NULL,
     aln <- aln[seqOrder]
     aln_mat <- as.matrix(aln)
     aln_df <- as.data.frame(aln_mat, stringsAsFactors=FALSE)
-    #return(aln) ## xx temp
-    #### get each extant codon for whole alignment (so I can get rid of stop codons
+    
+    #### get each extant codon for whole alignment (so I can get rid of stop codons)
     aln_codonsUnique <- alnSlicesUniqueSeqs(aln, sliceWidth=3)
-    #return(aln_codonsUnique) ## xx temp
-    #return(aln_codonsUnique) ## xx temp!
     codonsHaveOnlyStopsOrNs <- unlist(lapply(aln_codonsUnique, function(x) {
         nonStopOrNcodons <- unique( setdiff( toupper(x), stopCodons ) )
         # also get rid of any codon containing N or -
@@ -901,7 +927,6 @@ doMKtest <- function(myAlnFile=NULL,
         return(testOnlyStops)
     }))
     if(sum(codonsHaveOnlyStopsOrNs)>0) {
-        #cat("!!HERE!!\n")
         ## test for internal stop codons:
         internalCodonTests <- codonsHaveOnlyStopsOrNs[1:(length(codonsHaveOnlyStopsOrNs)-1)]
         if(sum(internalCodonTests)>0) {
@@ -914,6 +939,7 @@ doMKtest <- function(myAlnFile=NULL,
         cat("\n\nWARNING - this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon\n\n")
         numNT <- numNT - 3
         numCodons <- numCodons - 1
+        regionEndAAforOutput <- regionEndAAforOutput - 1
         aln <- narrow(aln, start=1, end=numNT)
         aln_mat <- as.matrix(aln)
         aln_df <- as.data.frame(aln_mat, stringsAsFactors=FALSE)
@@ -1069,17 +1095,18 @@ doMKtest <- function(myAlnFile=NULL,
     }
     #### make a table showing what's going on with each alignment position
     cat("    starting output table\n")
-    positionTable <- data.frame(pos=1:numNT, 
-                                codon=rep(1:numCodons, each=3),
-                                codon_pos=rep(1:3,numCodons),
-                                pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
-                                #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
-                                pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)!=1,
-                                pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
-                                pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
-                                #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
-                                pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)!=1,
-                                pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
+    positionTable <- data.frame(
+        pos=1:numNT + nucleotideOffsetForOutput, 
+        codon=rep(1:numCodons, each=3) + codonOffsetForOutput,
+        codon_pos=rep(1:3,numCodons),
+        pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
+        #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
+        pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)!=1,
+        pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
+        pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
+        #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
+        pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)!=1,
+        pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
     positionTable[,"fixed_difference"] <- positionTable[,"pop1_anc"] != positionTable[,"pop2_anc"] # not quite want I want, probably ?
     
     if(polarize) { 
@@ -1197,6 +1224,8 @@ doMKtest <- function(myAlnFile=NULL,
                                     seqs_not_used=seqs_not_used,
                                     length_NT=numNT,
                                     length_AA=numCodons,
+                                    region_start_coord_codons=regionStartAAforOutput, 
+                                    region_end_coord_codons=regionEndAAforOutput,
                                     filter_rare_alleles=filterRareAlleles,
                                     rare_allele_freq_threshold=alleleFreqThreshold,
                                     parameter_combining_approach=combiningApproach)
