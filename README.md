@@ -1,30 +1,31 @@
 # MKtests_JY
 
-## Janet Young Nov 2020
+## Janet Young (started Nov 2020)
 
 # Overview
 
-My R functions to perform McDonald-Kreitman tests
+This git repo shares my R functions to perform McDonald-Kreitman tests.
 
-Can polarize changes if an outgroup is provided
+Can polarize changes if a outgroup(s) are provided.
 
-Can filter out low frequency variants (this sometimes results in increased fixed changes, which is counter-intuitive, but occurs when there are polymorphisms where the ancestral allele is at low frequency and the derived allele is the only one that remains after filtering)
+Can filter out low frequency variants (this sometimes results in increased fixed changes, which is counter-intuitive, but occurs when there are polymorphisms where the ancestral allele is at low frequency and the derived allele is the only one that remains after filtering).
 
-Can specify a smaller region of the alignment to look at using the regionStartAA / regionEndAA options
+Can specify a smaller region of the alignment to look at using the regionStartAA / regionEndAA options.
 
 
-# Notes on the McDonald-Kreitman test
+# Notes on the McDonald-Kreitman (MK) test
 
-The [Wikipedia page](https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test) provides a nice description
+The MK test test was introduced in a [1991 paper by McDonald and Kreitman](https://www.nature.com/articles/351652a0), and there's a nice description on [Wikipedia](https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test).
 
 As well as a p-value testing for departure from neutrality, the MK test calculates: 
 - *alpha*, which represents the proportion of substitutions driven by positive selection.  
 - the *neutrality index*, where >1 indicates negative selection; <1 indicates positive selection
 
-
 Reminder - best practise for the MK test is to: 
 - use sequences from only a single population (e.g. ZI population of D. melanogaster) 
 - to remove rare polymorphisms (e.g. remove alleles with frequency <= 5%)
+
+Some people choose a chi-squared test to test for departures from neutrality (e.g. the MKT website), other people prefer a Fishers exact test ("FET").  My script gives both p-values, so the user can choose which to report.
 
 
 # Instructions
@@ -33,7 +34,7 @@ In R, we first set up for analysis by reading in my functions: `source("scripts/
 
 Each input file should be a single fasta-format, in-frame, multiple sequence alignment containing sequences from two species, and population data from at least one of those species.  Optionally, it might also contain one or more outgroup sequences.
 
-We run MK tests using the `doMKtest` function.   A basic example is shown here, with full code examples given in a [test script here](examples/example_script_MKtest.R), demonstrating how to polarize, and various other options and tools.
+We run MK tests using the `doMKtest` function.   A basic example is shown here
 ```
 source("scripts/MKfunctions.R")
 
@@ -45,7 +46,9 @@ MKresults_websiteExample <- doMKtest(
           pop2seqs=c("trachy1", "trachy2") )
 ```
 
-# An alternative: the MKT website
+This [test script](examples/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
+
+# An alternative: the [MKT website](http://mkt.uab.es/mkt/MKT.asp)
 
 I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output. 
 
