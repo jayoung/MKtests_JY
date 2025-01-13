@@ -19,7 +19,6 @@ Dependencies:
 
 And for complete functionality:
 - `openxlsx` package
-xxx others
 
 The way I have things set up, it might work better if you're using R/Rstudio in "project" mode.  Rprojects are great, but if you're resistant to that for some reason, and you see weird errors about not being able to read files (e.g. `Warning: cannot open file`, `No such file or directory` ), you should edit the paths given in the top of the `scripts/MKfunctions.R` file. 
 
@@ -57,7 +56,7 @@ MKresults_websiteExample <- doMKtest(
           pop2seqs=c("trachy1", "trachy2") )
 ```
 
-This [test script](scripts/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
+This [test script](scripts/example_script_MKtest.md), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
 
 # An alternative: the [MKT website](http://mkt.uab.es/mkt/MKT.asp)
 
