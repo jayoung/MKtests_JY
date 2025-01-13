@@ -1437,15 +1437,13 @@ the fixed and polymorphic changes are:
 Plot for the simple primate example:
 
 ``` r
-plotMKpositions(MKresults_websiteExample[["positions"]], 
+temp <- plotMKpositions(MKresults_websiteExample[["positions"]], 
                 title="MKresults websiteExample", 
                 pop1alias="pongo", pop2alias="trachy", 
                 setNumPlots=FALSE)
 ```
 
 ![](example_script_MKtest_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
-
-    ## NULL
 
 Plot for polarized data, Nicknack example:
 

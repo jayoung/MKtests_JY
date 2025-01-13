@@ -214,7 +214,7 @@ I also made a plotting function called `plotMKpositions` to show where the fixed
 Plot for the simple primate example:
 
 ```{r, fig.height=2, fig.width=7}
-plotMKpositions(MKresults_websiteExample[["positions"]], 
+temp <- plotMKpositions(MKresults_websiteExample[["positions"]], 
                 title="MKresults websiteExample", 
                 pop1alias="pongo", pop2alias="trachy", 
                 setNumPlots=FALSE)
