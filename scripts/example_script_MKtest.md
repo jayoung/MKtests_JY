@@ -99,7 +99,8 @@ alignment, wihch helps understand what’s going on with the alignment,
 and/or with troubleshooting.
 
 Here’s the `summary` table, transposed to a single column for easier
-viewing:
+viewing. The results are at the bottom, with a record of the input
+dataset and parameters used at the top.
 
 ``` r
 MKresults_websiteExample[["summary"]] %>% 
@@ -317,6 +318,103 @@ For p-values, to test for departures from neutrality, some people choose
 a chi-squared test (e.g. the MKT website), other people prefer a Fishers
 exact test (“FET”). My script gives both p-values, so the user can
 choose which to report. I think FET is more conservative.
+
+I also wrote a little function called `showContingencyTable` to pull out
+just the 2x2 contingency table showing counts from that summary table.
+Here’s that table in the format used by the MKT website people:
+
+``` r
+showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+<table class="table" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:right;">
+polymorphic
+</th>
+<th style="text-align:right;">
+fixed
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+synonymous
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+non-synonymous
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+</tbody>
+</table>
+
+And here it is transposed (I prefer this:)
+
+``` r
+showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+<table class="table" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:right;">
+synonymous
+</th>
+<th style="text-align:right;">
+non-synonymous
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+polymorphic
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fixed
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+</tbody>
+</table>
 
 Here’s the first 6 rows of the `positions` output table, transposed to a
 single column for easier viewing
@@ -1345,7 +1443,7 @@ plotMKpositions(MKresults_websiteExample[["positions"]],
                 setNumPlots=FALSE)
 ```
 
-![](example_script_MKtest_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](example_script_MKtest_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
     ## NULL
 
@@ -1358,7 +1456,7 @@ temp <- plotMKpositions(nnk_MKresults_polarized[["positions"]],
                         pop1alias="Dmel", pop2alias="Dsim")
 ```
 
-![](example_script_MKtest_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](example_script_MKtest_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
 # Finished
 

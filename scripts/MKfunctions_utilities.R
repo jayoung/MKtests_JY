@@ -263,3 +263,15 @@ getMinorMajorAlleles <- function(df,
     }
     return(output_table)
 }
+
+
+## showContingencyTable function gets the 2x2 contingency table for an individual MK test result:  e.g. the "summary" list element of the output of doMKtest
+showContingencyTable <- function(summaryTable) {
+    output <- data.frame(polymorphic=c(summaryTable[,"pop1_vs_pop2_Ps"],
+                                       summaryTable[,"pop1_vs_pop2_Pn"]), 
+                         fixed=c(summaryTable[,"pop1_vs_pop2_Ds"],
+                                 summaryTable[,"pop1_vs_pop2_Dn"]))
+    rownames(output) <- c("synonymous","non-synonymous")
+    output
+}
+

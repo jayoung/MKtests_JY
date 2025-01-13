@@ -70,7 +70,7 @@ The output of the doMKtest function (here, stored in the `MKresults_websiteExamp
 - list element 2 ("positions")   contains a per-position analysis of the alignment, wihch helps understand what's going on with the alignment, and/or with troubleshooting.   
 
 
-Here's the `summary` table, transposed to a single column for easier viewing:
+Here's the `summary` table, transposed to a single column for easier viewing. The results are at the bottom, with a record of the input dataset and parameters used at the top.
 
 ```{r}
 MKresults_websiteExample[["summary"]] %>% 
@@ -81,6 +81,25 @@ MKresults_websiteExample[["summary"]] %>%
 
 
 For p-values, to test for departures from neutrality, some people choose a chi-squared test  (e.g. the MKT website), other people prefer a Fishers exact test ("FET").  My script gives both p-values, so the user can choose which to report. I think FET is more conservative.
+
+I also wrote a little function called `showContingencyTable` to pull out just the 2x2 contingency table showing counts from that summary table. Here's that table in the format used by the MKT website people:
+
+```{r}
+showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+And here it is transposed (I prefer this:)
+
+```{r}
+showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+
 
 
 Here's the first 6 rows of the `positions` output table, transposed to a single column for easier viewing
