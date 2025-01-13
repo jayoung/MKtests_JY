@@ -46,7 +46,7 @@ MKresults_websiteExample <- doMKtest(
           pop2seqs=c("trachy1", "trachy2") )
 ```
 
-This [test script](scripts/examples/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
+This [test script](scripts/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
 
 # An alternative: the [MKT website](http://mkt.uab.es/mkt/MKT.asp)
 
