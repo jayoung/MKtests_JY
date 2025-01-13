@@ -36,10 +36,14 @@ Each input file should be a single fasta-format, in-frame, multiple sequence ali
 
 We run MK tests using the `doMKtest` function.   A basic example is shown here
 ```
+# load functions
 source("scripts/MKfunctions.R")
+    # you might need to edit the location of MKfunctions.R, depending on where you're working from
 
+# define location of example fasta format alignment file
 alnFile <- "test_data/MKTwebsiteExample/MKTwebsite_testAln/MKTwebsite_testAln.fa"
 
+# run MK test
 MKresults_websiteExample <- doMKtest(
           myAlnFile=alnFile, 
           pop1seqs=c("pongo1", "pongo2"), 
