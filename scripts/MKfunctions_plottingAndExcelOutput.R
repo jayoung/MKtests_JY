@@ -147,10 +147,11 @@ writeOneMKtestToExcel <- function(finalOutputTable, positionTable,
                                   outfileMK,
                                   pop1alias=NULL, pop2alias=NULL,
                                   keepNA = TRUE,
+                                  quiet=FALSE,
                                   NAcharacter="N.A." # only used if keepNA==FALSE
                                   ) {
     require(openxlsx)
-    cat("    saving tables to Excel file\n")
+    if(!quiet) { cat("    saving tables to Excel file\n") }
     polyCodonsToColor <- positionTable[which(positionTable[,"pop1_poly"] | 
                                                  positionTable[,"pop2_poly"] & 
                                                  !positionTable[,"fixed_difference"]),"codon"]

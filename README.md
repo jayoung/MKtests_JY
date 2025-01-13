@@ -4,13 +4,24 @@
 
 # Overview
 
-This git repo shares my R functions to perform McDonald-Kreitman tests.
+This git repo shares my R functions to perform McDonald-Kreitman tests, which are explained [here](https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test).
 
 Can polarize changes if a outgroup(s) are provided.
 
 Can filter out low frequency variants (this sometimes results in increased fixed changes, which is counter-intuitive, but occurs when there are polymorphisms where the ancestral allele is at low frequency and the derived allele is the only one that remains after filtering).
 
 Can specify a smaller region of the alignment to look at using the regionStartAA / regionEndAA options.
+
+# Using the code
+
+Dependencies: 
+- `Biostrings` package
+
+And for complete functionality:
+- `openxlsx` package
+xxx others
+
+The way I have things set up, it might work better if you're using R/Rstudio in "project" mode.  Rprojects are great, but if you're resistant to that for some reason, and you see weird errors about not being able to read files (e.g. `Warning: cannot open file`, `No such file or directory` ), you should edit the paths given in the top of the `scripts/MKfunctions.R` file. 
 
 
 # Notes on the McDonald-Kreitman (MK) test

@@ -1,5 +1,6 @@
-### load Janet's MK functions
-source("scripts/MKfunctions.R")
+### Janet's MK functions are in this file
+# to use them, you can do this:
+# source("scripts/MKfunctions.R")
 
 
 ### define an input alignment file:

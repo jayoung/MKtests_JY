@@ -1,0 +1,222 @@
+---
+title: "example_script_MKtest.Rmd"
+author: "Janet Young\n"
+date: "`r Sys.Date()`\n"
+output: github_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(kableExtra)
+```
+
+# Load Janet's MK functions
+
+Also loads the Biostrings package. 
+
+```{r, warning=FALSE, message=FALSE}
+source(here("scripts/MKfunctions.R"))
+```
+
+
+# Read in alignment, figure out sequence groupings
+
+Read in alignment file, and fix the seqnames to remove descriptions.
+
+This is an example alignment file I obtained from the MKT website. It contains four sequences of the ASIP gene: two seqs from Pongo pygmaeus (orangutan) and two from Trachypithecus cristatus (silvery lutung, an Old World monkey).
+
+
+```{r}
+alnFile <- here("test_data/MKTwebsiteExample/MKTwebsite_testAln.fa")
+aln <- readBStringSet(alnFile)
+aln
+```
+At first when we read in the alignment, sequence names also contain a description ("gi|909919..."): those are messy so I strip them off:
+
+```{r}
+names(aln) <- sapply( strsplit(names(aln), " "), "[[", 1)
+aln
+```
+
+Figure out the names of sequences from each population. This step will be different for your alignment.
+
+```{r}
+pongo_names <- grep("pongo", names(aln), value=TRUE)
+pongo_names
+```
+
+```{r}
+trachy_names <- grep("trachy", names(aln), value=TRUE)
+trachy_names
+```
+
+
+## Do the MK test
+
+Do the MK test - simplest example:
+
+```{r}
+MKresults_websiteExample <- doMKtest(
+    myAlnFile=alnFile, 
+    pop1seqs=pongo_names, 
+    pop2seqs=trachy_names)
+```
+
+The output of the doMKtest function (here, stored in the `MKresults_websiteExample` object) is a list, comprising two tables:      
+- list element 1 ("summary")  contains the MK test results.   
+- list element 2 ("positions")   contains a per-position analysis of the alignment, wihch helps understand what's going on with the alignment, and/or with troubleshooting.   
+
+
+Here's the `summary` table, transposed to a single column for easier viewing:
+
+```{r}
+MKresults_websiteExample[["summary"]] %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+
+For p-values, to test for departures from neutrality, some people choose a chi-squared test  (e.g. the MKT website), other people prefer a Fishers exact test ("FET").  My script gives both p-values, so the user can choose which to report. I think FET is more conservative.
+
+
+Here's the first 6 rows of the `positions` output table, transposed to a single column for easier viewing
+
+```{r}
+MKresults_websiteExample[["positions"]] %>% 
+    as_tibble() %>% 
+    head() %>% 
+    kable() %>% 
+    kable_styling()
+```
+
+The positions table is mostly for troubleshooting code - it's more detail than most users need, although if you want to dig into which codons contain changes, this would be one way to do it.
+
+## Saving results to Excel
+
+Now, we do the same MK test but save the results in an Excel file  (we add the `writeMKoutput`, `outDir` and `outfileStem` options).  If we also use aliases, as below, it'll help us interpret the column names in the output.
+
+As well as the list in R, we now also have an Excel output file called `MKTwebsite_testAln.MK.xlsx` (in the `test_data/MKTwebsiteExample` folder) There are two tabs, representing the two data.frames in the list output
+
+Note that here I also use the `quiet=TRUE` option to suppress the status messages that the `doMKtest` function outputs while it's running
+
+```{r}
+MKresults_websiteExample <- doMKtest(
+    myAlnFile=alnFile, 
+    writeMKoutput=TRUE, 
+    outDir = here("test_data/MKTwebsiteExample"), 
+    outfileStem = "MKresults",
+    pop1seqs=pongo_names, pop1alias = "pongo",
+    pop2seqs=trachy_names, pop2alias = "trachy",
+    quiet=TRUE)
+```
+
+## More options for the doMKtest function
+
+There are some useful options in the `doMKtest` function.
+
+### Filtering variants by frequency
+
+We can filter rare variants using the `filterRareAlleles`/`alleleFreqThreshold` options:
+
+(the example alignment only has two individuals for each population, so the filtering makes no sense for this example, and does not change the result)
+
+```{r}
+MKresults_websiteExample_removeRareVariants <- doMKtest(
+    myAlnFile=alnFile, 
+    pop1seqs=pongo_names, pop1alias = "pongo",
+    pop2seqs=trachy_names, pop2alias = "trachy",
+    filterRareAlleles=TRUE, alleleFreqThreshold=0.05,
+    quiet=TRUE)
+```
+
+### Looking only at subregions of the alignment
+
+We can look at only a certain region of the alignment, using the `regionStartAA`/`regionEndAA` options (coordinates are in amino acids, with respect to the alignment:
+
+```{r}
+MKresults_websiteExample_region1 <- doMKtest(
+    myAlnFile=alnFile, 
+    pop1seqs=pongo_names, pop1alias = "pongo",
+    pop2seqs=trachy_names, pop2alias = "trachy",
+    regionStartAA=1, regionEndAA=21,
+    quiet=TRUE)
+```
+
+# Polarized MK tests
+
+We can do polarized MK tests, if we supply an outgroup.
+
+First, we read a different example alignment, of the Nicknack gene (CG17802) from *D. melanogaster* and *D. simulans*, with *D. yakuba* as an outgroup. Results published [here](https://elifesciences.org/articles/63368).
+
+```{r}
+nnk_alnFile <- here("test_data/Nnk_Kasinathan_2020/802.plusOutgroup_aln1_NT.edit.noStops.degapcodon.fas")
+nnk_aln <- readBStringSet(nnk_alnFile)
+nnk_aln
+```
+
+Then we get the names of sequences in each population:
+```{r}
+nnk_Dmel_names <- names(nnk_aln)[3:length(nnk_aln)]
+nnk_Dsim_name <- names(nnk_aln)[2]
+nnk_Dyak_names <- names(nnk_aln)[1]
+```
+
+Now we can use the `doMKtest` function, adding the `polarize=TRUE` option, and supplying outgroup seqnames via the `outgroupSeqs` option:
+
+```{r}
+nnk_MKresults_polarized <- doMKtest(
+    myAlnFile=nnk_alnFile, 
+    pop1seqs=nnk_Dmel_names, pop1alias = "Dmel",
+    pop2seqs=nnk_Dsim_name, pop2alias = "Dsim",
+    polarize=TRUE,
+    outgroupSeqs=nnk_Dyak_names,
+    quiet=TRUE )
+```
+
+# Combining results from multiple tests
+
+If we've performed more than one MK test, we can combine the results using the `combineMKresults` function. The R object that's returned will be a single data.frame, combining the results. The Excel file will have the same table summarizing all the MK results, and one additional tab for each MK alignment showing each positions table.
+
+```{r}
+MKresults_combined <- combineMKresults(list(results1=MKresults_websiteExample,
+                                            results2=nnk_MKresults_polarized),
+                                       outFile="combinedMKresults.xlsx",
+                                       outDir=here("test_data/test_output"))
+```
+
+# Plotting changes
+
+I also made a plotting function called `plotMKpositions` to show where the fixed and polymorphic changes are:
+
+Plot for the simple primate example:
+
+```{r, fig.height=2, fig.width=7}
+plotMKpositions(MKresults_websiteExample[["positions"]], 
+                title="MKresults websiteExample", 
+                pop1alias="pongo", pop2alias="trachy", 
+                setNumPlots=FALSE)
+```
+
+Plot for polarized data, Nicknack example:
+
+```{r, fig.height=5, fig.width=7}
+temp <- plotMKpositions(nnk_MKresults_polarized[["positions"]], 
+                        title="Nnk MK test", 
+                        plotPolarizedPop1=TRUE, plotPolarizedPop2=TRUE, 
+                        pop1alias="Dmel", pop2alias="Dsim")
+```
+
+
+# Finished
+
+Show sessionInfo, to record package versions in case we need to do any troubleshooting.
+
+
+```{r}
+sessionInfo()
+```
+

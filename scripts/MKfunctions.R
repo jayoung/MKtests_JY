@@ -1,9 +1,14 @@
-### https://en.wikipedia.org/wiki/McDonald%E2%80%93Kreitman_test
-
 require(Biostrings)
-source("scripts/MKfunctions_utilities.R")
-source("scripts/MKfunctions_plottingAndExcelOutput.R")
-load("scripts/codonPaths/codonPathsFromBioperl.Rdata")
+
+## these paths are relative to the location of the MKfunctions.R file
+source("MKfunctions_utilities.R")
+source("MKfunctions_plottingAndExcelOutput.R")
+load("codonPaths/codonPathsFromBioperl.Rdata")
+
+### these were paths relative to the location of the project's top directory:
+# source("scripts/MKfunctions_utilities.R")
+# source("scripts/MKfunctions_plottingAndExcelOutput.R")
+# load("scripts/codonPaths/codonPathsFromBioperl.Rdata")
 
 ## on fast the base dir is /fh/fast/malik_h/user/jayoung/MKtest/MKtests_JY
 ## on mac (local) the base dir is /Users/jayoung/Desktop/mac_workStuff/mac_MKtests/MKtests_JY
@@ -116,7 +121,7 @@ reconstructAncestor_includeUncertainty <- function(ingroup, outgroups,
 getCodonChangeCounts <- function(codonsBefore, codonsAfter, 
                                  paths=codonPaths, 
                                  extraVerbose=FALSE) {
-
+    
     if (length(codonsBefore) != length(codonsAfter)){
         stop("ERROR - codonsBefore and codonsAfter are different lengths\n\n")    
     }
@@ -467,7 +472,7 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
                 ns <- mean(results[,"ns"])
                 s <- mean(results[,"s"])
             }
-
+            
             ## fixed this Dec 7, 2022. I was previously minimizing ONLY on ns.
             if (combiningApproach=="conservativeOld") {
                 mostConservativeRow <- which.min(results[,"ns"])[1]
@@ -492,7 +497,7 @@ categorizePolymorphisms_new_byNuc <- function(ancCodons_withUncert,
                 ns <- results[,"ns"]
                 s <- results[,"s"]
             }
-
+            
             results <- list(ns=ns, s=s)
             return(results)
         })
@@ -661,7 +666,7 @@ makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
 # (if there's a tie between major allele freqs we arbitrarily pick one)
 filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
     if(alleleFreqThreshold==0) {
-        cat("\n\n    WARNING - you did not specify an allele frequency threshold, so we are not filtering out rare alleles\n\n")
+        warning("you did not specify an allele frequency threshold, so we are not filtering out rare alleles\n\n")
         return(myAln)
     }
     myAln_df <- as.data.frame(as.matrix(myAln), stringsAsFactors=FALSE)
@@ -755,7 +760,7 @@ doMKtest <- function(myAlnFile=NULL,
     
     ### read in alignment (if we're using myAlnFile), figure out output file names
     if(!is.null(myAlnFile)) {
-        cat("\n##### reading alignment from file",myAlnFile,"\n")
+        if(!quiet) { cat("\n##### reading alignment from file",myAlnFile,"\n") }
         outfileStem <- gsub(".fasta$","", myAlnFile)
         outfileStem <- gsub(".fas$","", outfileStem)
         outfileStem <- gsub(".fa$","", outfileStem)
@@ -864,23 +869,26 @@ doMKtest <- function(myAlnFile=NULL,
         stop("ERROR - alignment length is not a multiple of 3: ",numNT,"\n\n")
     }
     
-    cat("    splitting alignment into groups and tabulating nucleotides\n")
+    if(!quiet) { cat("    splitting alignment into groups and tabulating nucleotides\n") }
     #### check that all pop1 and pop2 seqs are in the alignment (and possibly outgroups)
     if (sum(!pop1seqs %in% names(aln))>0) {
         missingSeqs <- setdiff(pop1seqs, names(aln))
-        cat("ERROR - there are seqs named in the pop1seqs argument that are not in the alignment file.\nFile=",
+        myError <- paste(
+            "ERROR - there are seqs named in the pop1seqs argument that are not in the alignment file.\nFile=",
             myAlnFile,
             "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-            "\nseqs present:", paste(names(aln), collapse=" "), "\n")
-        stop()
+            "\nseqs present:", paste(names(aln), collapse=" "), 
+            "\n", sep="")
+        stop(myError)
     }
     if (sum(!pop2seqs %in% names(aln))>0) {
         missingSeqs <- setdiff(pop2seqs, names(aln))
-        cat("ERROR - there are seqs named in the pop2seqs argument that are not in the alignment file.\nFile=",
-            myAlnFile,
-            "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-            "\nseqs present:", paste(names(aln), collapse=" "), "\n")
-        stop()
+        myError <- paste("ERROR - there are seqs named in the pop2seqs argument that are not in the alignment file.\nFile=",
+                         myAlnFile,
+                         "\nmissing seqs:", paste(missingSeqs, collapse=" "),
+                         "\nseqs present:", paste(names(aln), collapse=" "), 
+                         "\n", sep="")
+        stop(myError)
     }
     if(!is.null(outgroupSeqs)) {
         ## check for zero length
@@ -890,11 +898,12 @@ doMKtest <- function(myAlnFile=NULL,
         ## check whether all outgroupSeqs are in the alignment
         if (sum(!unlist(outgroupSeqs) %in% names(aln))>0) {
             missingSeqs <- setdiff(unlist(outgroupSeqs), names(aln))
-            cat("ERROR - there are seqs named in the outgroupSeqs argument that are not in the alignment file.\nFile=",
-                myAlnFile,
-                "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-                "\nseqs present:", paste(names(aln), collapse=" "), "\n")
-            stop()
+            myError <- paste("ERROR - there are seqs named in the outgroupSeqs argument that are not in the alignment file.\nFile=",
+                             myAlnFile,
+                             "\nmissing seqs:", paste(missingSeqs, collapse=" "),
+                             "\nseqs present:", paste(names(aln), collapse=" "), 
+                             "\n", sep="")
+            stop(myError)
         }
     }
     
@@ -936,7 +945,7 @@ doMKtest <- function(myAlnFile=NULL,
                  "\nAll codons found at those positions are ",aln_codonsUnique[failedTests],"\n\n")
         }
         ## the stop codon must be at the end - we can strip it out
-        cat("\n\nWARNING - this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon\n\n")
+        warning("this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon\n\n")
         numNT <- numNT - 3
         numCodons <- numCodons - 1
         regionEndAAforOutput <- regionEndAAforOutput - 1
@@ -969,7 +978,7 @@ doMKtest <- function(myAlnFile=NULL,
     aln_tables_freq <- lapply( aln_tables, getACGTfreqs )
     
     # for each population, get major and minor alleles and their frequencies, flag alleles below a certain frequency threshold (but I do filtering in a separate step, later)
-    cat("    looking at allele frequencies\n")
+    if(!quiet) { cat("    looking at allele frequencies\n") }
     aln_tables_majorMinor <- lapply(aln_tables_freq, 
                                     getMinorMajorAlleles, 
                                     flagRareAlleles=flagRareAlleles, 
@@ -981,7 +990,7 @@ doMKtest <- function(myAlnFile=NULL,
     #### for each of pop1 and pop2, we replace rare alleles with the major allele
     if(filterRareAlleles) {
         alns_filt <- lapply( c("pop1","pop2"), function(thisPop) {
-            cat("    filtering alleles for",thisPop,"\n")
+            if(!quiet) { cat("    filtering alleles for",thisPop,"\n") }
             filterAlnRemoveRareVariants(aln_split[[thisPop]],
                                         alleleFreqThreshold=alleleFreqThreshold)
         })
@@ -1027,7 +1036,7 @@ doMKtest <- function(myAlnFile=NULL,
     # stop codons get excluded from the possibilities in uncertain codons 
     # for now we are treating all outgroups (e.g. yak, sec) as one big group. We polarize pop1 using pop2 if possible, and if it's still unresolved we use the outgroup.
     # but I might want to have a hierarchy of outgroups based on species tree.
-    cat("    inferring ancestors\n")
+    if(!quiet) { cat("    inferring ancestors\n") }
     outgroupsForPop1 <- list(aln_split_PositionsUnique[["pop2"]])
     if (!is.null(outgroupSeqs)) {
         outgroupsForPop1 <- c(outgroupsForPop1, outgroups_aln_split_PositionsUnique)
@@ -1094,7 +1103,7 @@ doMKtest <- function(myAlnFile=NULL,
         writeXStringSet(newAln, outfileAln, format="fasta")
     }
     #### make a table showing what's going on with each alignment position
-    cat("    starting output table\n")
+    if(!quiet) { cat("    starting output table\n") }
     positionTable <- data.frame(
         pos=1:numNT + nucleotideOffsetForOutput, 
         codon=rep(1:numCodons, each=3) + codonOffsetForOutput,
@@ -1138,19 +1147,19 @@ doMKtest <- function(myAlnFile=NULL,
     #### go codon by codon to figure out effect of fixed changes.  polymorphisms I look at individually. fixed changes I consider whole codon at once and use codonPaths. I average over uncertainty in codons
     
     ### unpolarized fixed changes:
-    cat("    categorizing population 1 vs 2 fixed changes\n")
+    if(!quiet) { cat("    categorizing population 1 vs 2 fixed changes\n") }
     pop1_vs_pop2fixedCounts <- getCodonChangeCountsFromCodonList(
         pop1_anc_withUncert_codons, 
         pop2_anc_withUncert_codons, 
         combiningApproach=combiningApproach, 
         extraVerbose=extraVerbose)
-
+    
     positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                       pop1_vs_pop2fixedCounts,
                                                       outputColPrefix="pop1_vs_pop2")
     
     ### categorizes the (pop1) polymorphisms, adding pop1_Pn and pop1_Ps to positionTable
-    cat("    categorizing polymorphisms\n")
+    if(!quiet) { cat("    categorizing polymorphisms\n") }
     pop1_polyCounts <- categorizePolymorphisms_new_byCodon(pop1_anc_withUncert_codons, 
                                                            aln_split_PositionsUnique[["pop1"]],
                                                            combiningApproach=combiningApproach,
@@ -1167,7 +1176,7 @@ doMKtest <- function(myAlnFile=NULL,
     
     if (polarize) {
         #### polarized, pop1 branch:
-        cat("    getting polarized changes\n\n")
+        if(!quiet) { cat("    getting polarized changes\n\n") }
         if(extraVerbose) {
             cat("getting pop1_and_pop2_anc_to_pop1_FixedCounts:\n")
         }
@@ -1207,7 +1216,7 @@ doMKtest <- function(myAlnFile=NULL,
             positionTable[,"pop2_polarized_Ds"] 
     }
     
-    cat("    doing MK tests\n")
+    if(!quiet) { cat("    doing MK tests\n") }
     MKtable <- MKoutput(positionTable, polarize=polarize)
     
     ## another table that has more info in it, for checking purposes
@@ -1229,7 +1238,7 @@ doMKtest <- function(myAlnFile=NULL,
                                     filter_rare_alleles=filterRareAlleles,
                                     rare_allele_freq_threshold=alleleFreqThreshold,
                                     parameter_combining_approach=combiningApproach)
- 
+    
     ## a tiny bit of help to see what's in each population
     if(!is.null(outgroupSeqs)) {
         finalOutputTable[,"outgroup"] <- unlist(outgroupSeqs)
@@ -1240,6 +1249,7 @@ doMKtest <- function(myAlnFile=NULL,
     
     if(writeMKoutput) {
         writeOneMKtestToExcel(finalOutputTable, positionTable, outfileMK,
+                              quiet=quiet,
                               pop1alias=pop1alias, pop2alias=pop2alias) 
     }
     return(list(summary=finalOutputTable, positions=positionTable))
