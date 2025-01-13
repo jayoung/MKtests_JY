@@ -46,7 +46,7 @@ MKresults_websiteExample <- doMKtest(
           pop2seqs=c("trachy1", "trachy2") )
 ```
 
-This [test script](examples/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
+This [test script](scripts/examples/example_script_MKtest.R), gives additional code examples, including how to polarize, remove rare variants, and various other options and tools.
 
 # An alternative: the [MKT website](http://mkt.uab.es/mkt/MKT.asp)
 
@@ -54,7 +54,7 @@ I am using results provided by http://mkt.uab.es/mkt/MKT.asp to check my output.
 
 A note about results from that website: it ignores alignment positions where >=1 sequence contains a gap OR an N (e.g. demonstrate that using the two test alignments in MKTwebsite_testAln_addNseqs).  In contrast, my script includes those positions but does not count the gap or N as a change.  Only in the case where one of the populations has only gap or N at a position, then I cannot count any fixed changes in that position.
 
-For particularly gappy alignments, this can be a problem. This is why we use Lisa's script to remove any seq containing Ns if we want to perform MK tests using the website.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
+For particularly gappy alignments, this can be a problem. This is why we use the utility script `removeSeqsContainingNs.pl` (see [below](https://github.com/jayoung/MKtests_JY/tree/main?tab=readme-ov-file#utility-scripts-in-perl-to-help-use-popfly-data)) to remove any seq containing Ns if we want to perform MK tests using the website.  As an extreme example, imagine you have an alignment with quite some seqs with Ns, and the Ns are spread around the sequences, something like this:
 ```
     NNNNNNACGTAGCTA
     ACGTNNNNNNNNNNN
