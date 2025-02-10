@@ -1,0 +1,165 @@
+---
+title: "test_alns_with_gaps.Rmd"
+author: "Janet Young\n"
+date: "`r Sys.Date()`\n"
+output: github_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(kableExtra)
+# MKfunctions.R Also loads the Biostrings package. 
+source(here("scripts/MKfunctions.R"))
+```
+
+
+# gaps in an entire population
+
+
+I think maybe I get an error when all members of one population have a gap for a whole codon. Check it!
+
+```{r, error = TRUE}
+## example WITHOUT gaps - should be no problem
+alnFile <- here("test_data/MKTwebsiteExample/MKTwebsite_testAln.fa")
+aln <- readBStringSet(alnFile)
+names(aln) <- sapply(strsplit(names(aln), " "), "[[", 1)
+alnSpecies <- gsub("\\d","",names(aln))
+alnPopulations <- split(names(aln), alnSpecies)
+```
+
+```{r}
+## example WITH gaps in all members of one population
+alnWithGapsFile <- here("test_data/testData_for_troubleshooting/test_otherMiscProblemAlns/test_onePopAllGaps.fa")
+alnWithGaps <- readBStringSet(alnWithGapsFile)
+names(alnWithGaps) <- sapply(strsplit(names(alnWithGaps), " "), "[[", 1)
+alnWithGapsSpecies <- gsub("\\d","",names(alnWithGaps))
+alnWithGapsPopulations <- split(names(alnWithGaps), alnWithGapsSpecies)
+```
+
+```{r}
+## some smaller alns for testing
+aln_small <- narrow(aln, start=1, end=21)
+alnWithGaps_small <- narrow(alnWithGaps, start=1, end=21)
+
+## a modified version that has a frameshifting gap - I want to give a warning for this
+alnWithGaps_small_badGap <- alnWithGaps_small
+subseq(alnWithGaps_small_badGap[["pongo1"]], start=19, end=19) <- BString("-")
+subseq(alnWithGaps_small_badGap[["pongo2"]], start=19, end=19) <- BString("-")
+```
+
+
+For testing, I made a small example alignment, that has a gap in every pop1 sequences at some positions
+
+```{r}
+alnWithGaps_small %>% 
+    as.character() %>% 
+    as_tibble(rownames="seqnames") %>% 
+    dplyr::rename(sequence=value)
+```
+
+
+
+
+
+
+```{r}
+### removeEntirePopulationGapsFromAln - a function that removes positions that are ENTIRELY gaps in one or other population from the entire alignment
+removeEntirePopulationGapsFromAln <- function(aln, 
+                                              pop1seqs=NULL, pop2seqs=NULL,
+                                              outgroupSeqs=NULL ) {
+    ## check inputs look OK
+    checkAlignmentAndPopulationNames(aln, 
+                                     pop1seqs=pop1seqs, pop2seqs=pop2seqs,
+                                     outgroupSeqs=outgroupSeqs)
+    
+    ## get a list that has aln for each population
+    alns_each_pop <- list()
+    if(!is.null(pop1seqs)) { alns_each_pop[["pop1"]] <- aln[pop1seqs] }
+    if(!is.null(pop2seqs)) { alns_each_pop[["pop2"]] <- aln[pop2seqs] }
+    if(!is.null(outgroupSeqs)) { alns_each_pop[["outgroups"]] <- aln[outgroupSeqs] }
+    
+    ## DETECT gaps using each population individually
+    gapsToRemove <- lapply(names(alns_each_pop), function(each_popname) {
+        
+        aln_one_pop_df <- strsplit(as.character(alns_each_pop[[each_popname]]), "") %>% 
+            as.data.frame()
+        all_gap_tests <- apply(aln_one_pop_df, 1, function(x) {
+            sum(!x %in% c("N","n","-")) == 0
+        })
+        all_gap_positions <- which(all_gap_tests)
+        ## check that num gaps is a multiple of three
+        if ((length(all_gap_positions) %% 3) != 0) {
+            warning(
+                "\n\nWARNING - population ", each_popname, 
+                " had ", length(all_gap_positions), " positions that are gaps in every sequence.\n",
+                "This is NOT a multiple of three - degapping MIGHT make the alignment go out of frame\n\n")
+        }
+        return(all_gap_positions)
+        
+    })
+    names(gapsToRemove) <- names(alns_each_pop)
+    
+    ## REMOVE gaps in ANY population from the entire alignment
+    allGaps <- unlist(gapsToRemove, use.names = FALSE)
+    allGaps_ir <- IRanges(start=allGaps, end=allGaps)
+    allGaps_ir <- as(allGaps_ir, "NormalIRanges")
+    maskedAln <- DNAMultipleAlignment(aln, colmask = allGaps_ir) 
+    newAln <- maskedAln %>% DNAStringSet()
+    return(newAln)
+}
+
+removeEntirePopulationGapsFromAln(alnWithGaps_small_badGap, 
+                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+
+### xxx EITHER I use the removeEntirePopulationGapsFromAln function at the start of doMKtest (but then coordinates in the output won't reflect the alignment)
+
+## OR I better handle codons where entire population has a gap.  I think I like the second one better. Maybe I keep the removeEntirePopulationGapsFromAln function around because sometimes we might want to clean up an alignment BEFORE we run MK tests. 
+
+## xx do I want to RECORD how many positions were removed? and which ones? 
+
+```
+
+
+# Check doMKtest still works on a good alignment, after messing with the script
+
+```{r}
+# debug(doMKtest)
+source(here("scripts/MKfunctions.R"))
+MKresults <- doMKtest(myAln=aln, 
+                      pop1seqs=alnPopulations[["pongo"]],
+                      pop2seqs=alnPopulations[["trachy"]],
+                      outfileStem="testXX",
+                      # regionStartAA=6, regionEndAA=6,
+                      quiet=FALSE, extraVerbose=FALSE)
+MKresults[["summary"]] %>% 
+    as_tibble()
+# undebug(doMKtest)
+```
+
+
+```{r}
+# debug(doMKtest)
+source(here("scripts/MKfunctions.R"))
+MKresults <- doMKtest(alnWithGapsFile, 
+                      pop1seqs=alnWithGapsPopulations[["pongo"]],
+                      pop2seqs=alnWithGapsPopulations[["trachy"]],
+                      regionStartAA=6, regionEndAA=6,
+                      quiet=FALSE, extraVerbose=TRUE)
+# undebug(doMKtest)
+```
+
+
+
+
+# Finished
+
+```{r}
+sessionInfo()
+```
+
+
+

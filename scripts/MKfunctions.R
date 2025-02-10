@@ -1,9 +1,15 @@
 require(Biostrings)
+require(here)
 
-## these paths are relative to the location of the MKfunctions.R file
-source("MKfunctions_utilities.R")
-source("MKfunctions_plottingAndExcelOutput.R")
-load("codonPaths/codonPathsFromBioperl.Rdata")
+## 
+scripts_dir <- here("scripts/")
+if(!dir.exists(scripts_dir)) {
+    stop("\n\nERROR - fix scripts/MKfunctions.R to tell it the correct location of the scripts/ directory\n\n")
+}
+
+source(paste(scripts_dir, "MKfunctions_utilities.R", sep="") )
+source(paste(scripts_dir, "MKfunctions_plottingAndExcelOutput.R", sep=""))
+load(paste(scripts_dir, "codonPaths/codonPathsFromBioperl.Rdata", sep=""))
 
 ### these were paths relative to the location of the project's top directory:
 # source("scripts/MKfunctions_utilities.R")
@@ -701,6 +707,111 @@ filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
     return(aln_filt)
 }
 
+
+
+
+### checkAllSeqnamesInAln: check a single character vector of seqnames to see if they're all in the alignment
+checkAllSeqnamesInAln <- function(aln, names_to_check) {
+    my_error <- FALSE
+    if(!is.null(names_to_check)) {
+        missing_seqs <- setdiff(names_to_check, names(aln))
+        missing_seqs <- paste(missing_seqs, collapse=",")
+        if(sum(!names_to_check %in% names(aln))>0) {
+            my_error <- TRUE
+        }
+    }
+    return(list(error=my_error, missing_seqs=missing_seqs))
+}
+
+
+### checkAlignmentAndPopulationNames - does some checks on the alignment. Returns TRUE if everything is OK. We check:
+# Are all seqnames present? 
+# Do populations contain any overlapping seqnames?
+checkAlignmentAndPopulationNames <- function(aln, 
+                                             pop1seqs=NULL, pop2seqs=NULL,
+                                             outgroupSeqs=NULL) {
+    ## put arguments in a list to make things easier
+    population_names <- list()
+    if(!is.null(pop1seqs)) { population_names[["pop1"]] <- pop1seqs }
+    if(!is.null(pop2seqs)) { population_names[["pop2"]] <- pop2seqs }
+    if(!is.null(outgroupSeqs)) { population_names[["outgroups"]] <- outgroupSeqs }
+    
+    ## check all seqnames are present in the alignment
+    ## the function doesn't return anything useful - stops with error if needed
+    temp <- lapply(names(population_names), function(each_pop_name) {
+        checked <- checkAllSeqnamesInAln(aln,population_names[[each_pop_name]])
+        if(checked[["error"]]){
+            stop("\n\nERROR - some seqnames in ",
+                 each_pop_name,
+                 " are missing from the alignment: ",
+                 checked[["missing_seqs"]], "\n\n")
+        }
+    })
+    # 
+    # 
+    # if(!is.null(pop1seqs)) {
+    #     checked <- checkAllSeqnamesInAln(aln,pop1seqs)
+    #     if(checked[["error"]]){
+    #         stop("\n\nERROR - some seqnames in pop1 are missing from the alignment: ",
+    #              checked[["missing_seqs"]], "\n\n")
+    #     }
+    # }
+    # if(!is.null(pop2seqs)) {
+    #     checked <- checkAllSeqnamesInAln(aln,pop2seqs)
+    #     if(checked[["error"]]){
+    #         stop("\n\nERROR - some seqnames in pop2 are missing from the alignment: ",
+    #              checked[["missing_seqs"]], "\n\n")
+    #     }
+    # }
+    # if(!is.null(outgroupSeqs)) {
+    #     checked <- checkAllSeqnamesInAln(aln,outgroupSeqs)
+    #     if(checked[["error"]]){
+    #         stop("\n\nERROR - some seqnames in the outgroup list are missing from the alignment: ",
+    #              checked[["missing_seqs"]], "\n\n")
+    #     }
+    # }
+
+        ## check names in different populations don't overlap:
+    if(length(intersect(pop1seqs, pop2seqs))>0) {
+        overlap_seqs <- intersect(pop1seqs, pop2seqs)
+        overlap_seqs <- paste(overlap_seqs, collapse=",")
+        stop("\n\nERROR - some seqnames are in both pop1 and pop2: ",
+             overlap_seqs, "\n\n")
+    }
+    if(length(intersect(pop1seqs, outgroupSeqs))>0) {
+        overlap_seqs <- intersect(pop1seqs, outgroupSeqs)
+        overlap_seqs <- paste(overlap_seqs, collapse=",")
+        stop("\n\nERROR - some seqnames are in both pop1 and the outgroup list: ",
+             overlap_seqs, "\n\n")
+    }
+    if(length(intersect(pop2seqs, outgroupSeqs))>0) {
+        overlap_seqs <- intersect(pop2seqs, outgroupSeqs)
+        overlap_seqs <- paste(overlap_seqs, collapse=",")
+        stop("\n\nERROR - some seqnames are in both pop2 and the outgroup list: ",
+             overlap_seqs, "\n\n")
+    }
+    
+    #### check no repeated seq names in each argument
+    ## the function doesn't return anything useful - stops with error if needed
+    temp <- lapply(names(population_names), function(each_pop_name) {
+        pop <- population_names[[each_pop_name]]
+        repeated_names <- pop[duplicated(pop)]
+        repeated_names <- paste(repeated_names, collapse=",")
+        if (length(pop) != length(unique(pop))) {
+            stop("\n\nERROR - there are one or more repeated names in the ",
+                 each_pop_name," argument: ",repeated_names,"\n\n")    
+        }
+    })
+    
+    names_good <- TRUE
+    return(names_good)
+}
+
+# checkAlignmentAndPopulationNames(alnWithGaps_small,
+#                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+#                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+
+
 ##### doMKtest is a standalone function, that runs the MK tests given a fasta alignment file and a bunch of options:
 
 ### I could:
@@ -724,6 +835,7 @@ filterAlnRemoveRareVariants <- function(myAln, alleleFreqThreshold=0) {
 # alleleFreqThreshold: used by flagRareAlleles
 # writeAncFasta and writeMKoutput - will I write output files for each individual alignment, or will I wait until I combine output from several alignments (=default) 
 # regionStartAA / regionEndAA (default=NULL) - can specify a codon position to start and end the analysis at
+
 doMKtest <- function(myAlnFile=NULL, 
                      myAln=NULL, outfileStem=NULL,
                      outDir=NULL, 
@@ -783,6 +895,20 @@ doMKtest <- function(myAlnFile=NULL,
     ## make sure everything is upper case
     aln <- BStringSet(toupper(aln))
     
+    
+    
+    ## we're expecting outgroup seqs to be a list (to allow hierarchy of outgroups) but maybe the user wanted to keep it simple and specify just a character vector:
+    if (class(outgroupSeqs)=="character") {
+        outgroupSeqs <- list(outgroup1=outgroupSeqs)
+    }
+    
+    ## check all specified sequences are in the alignment. It will stop() with an ERROR message if not.
+    outgroupSeqsToTest <- outgroupSeqs
+    if(class(outgroupSeqsToTest) == "list") {
+        outgroupSeqsToTest <- unlist(outgroupSeqsToTest, use.names = FALSE)
+    }
+    checkAlignmentAndPopulationNames(aln, pop1seqs, pop2seqs, outgroupSeqsToTest)
+    
     ## possibly trim
     codonOffsetForOutput <- 0
     nucleotideOffsetForOutput <- 0
@@ -807,26 +933,6 @@ doMKtest <- function(myAlnFile=NULL,
         nucleotideOffsetForOutput <- regionStartAA_nuc - 1
     }
     
-    ## check population names don't overlap with each other
-    if(length(intersect(pop1seqs, pop2seqs))>0) {
-        overlappingNames <- intersect(pop1seqs, pop2seqs)
-        overlappingNames <- paste(overlappingNames, collapse=" ")
-        stop("\n\nERROR - there are sequence names found in both pop1seqs and pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
-    }
-    if(!is.null(outgroupSeqs)) {
-        outgroupSeqsToTest <- unlist(outgroupSeqs, use.names = FALSE)
-        overlappingNames <- intersect(outgroupSeqsToTest, c(pop1seqs, pop2seqs))
-        if(length(overlappingNames)>0) {
-            overlappingNames <- paste(overlappingNames, collapse=" ")
-            stop("\n\nERROR - there are sequence names found in both outgroupSeqs and pop1seqs/pop2seqs - that's not right.\nThe overlapping names are: ",overlappingNames,"\n\n")
-        }
-        
-        ## we're also expecting outgroup seqs to be a list (to allow hierarchy of outgroups) but maybe the user wanted to keep it simple and specify just a character vector:
-        if (class(outgroupSeqs)=="character") {
-            outgroupSeqs <- list(outgroup1=outgroupSeqs)
-        }
-    }
-    
     if (!is.null(outDir)) {
         if (!dir.exists(outDir)) { 
             # only need to make the output dir if we are going to write either of the output file types
@@ -847,13 +953,14 @@ doMKtest <- function(myAlnFile=NULL,
     if ( sum(!toupper(unlist(aln_df)) %in% acceptableNucs) > 0) {
         unrecognizedNucs <- unique(unlist(aln_df))
         unrecognizedNucs <- unrecognizedNucs[ which(! unrecognizedNucs %in% acceptableNucs ) ]
-        stop("ERROR - there are characters in the alignment I don't know what to do with:", unrecognizedNucs, "\n\n")
+        unrecognizedNucs <- paste(unrecognizedNucs, collapse=" ")
+        stop("ERROR - there are characters in the alignment I don't know what to do with: ", unrecognizedNucs, "\n\n")
     }
     
     #### how many seqs
     numSeqs <- length(aln)
     if (numSeqs < 3) {
-        stop("ERROR - not enough seqs for polarized MK test: there are only",numSeqs,"seqs\n\n")
+        stop("ERROR - not enough seqs for polarized MK test: there are only ",numSeqs," seqs\n\n")
     }
     
     #### alignment length
@@ -870,53 +977,6 @@ doMKtest <- function(myAlnFile=NULL,
     }
     
     if(!quiet) { cat("    splitting alignment into groups and tabulating nucleotides\n") }
-    #### check that all pop1 and pop2 seqs are in the alignment (and possibly outgroups)
-    if (sum(!pop1seqs %in% names(aln))>0) {
-        missingSeqs <- setdiff(pop1seqs, names(aln))
-        myError <- paste(
-            "ERROR - there are seqs named in the pop1seqs argument that are not in the alignment file.\nFile=",
-            myAlnFile,
-            "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-            "\nseqs present:", paste(names(aln), collapse=" "), 
-            "\n", sep="")
-        stop(myError)
-    }
-    if (sum(!pop2seqs %in% names(aln))>0) {
-        missingSeqs <- setdiff(pop2seqs, names(aln))
-        myError <- paste("ERROR - there are seqs named in the pop2seqs argument that are not in the alignment file.\nFile=",
-                         myAlnFile,
-                         "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-                         "\nseqs present:", paste(names(aln), collapse=" "), 
-                         "\n", sep="")
-        stop(myError)
-    }
-    if(!is.null(outgroupSeqs)) {
-        ## check for zero length
-        if(length(unlist(outgroupSeqs))==0) {
-            stop("\n\nERROR - you supplied an empty outgroupSeqs object\n\n")
-        }
-        ## check whether all outgroupSeqs are in the alignment
-        if (sum(!unlist(outgroupSeqs) %in% names(aln))>0) {
-            missingSeqs <- setdiff(unlist(outgroupSeqs), names(aln))
-            myError <- paste("ERROR - there are seqs named in the outgroupSeqs argument that are not in the alignment file.\nFile=",
-                             myAlnFile,
-                             "\nmissing seqs:", paste(missingSeqs, collapse=" "),
-                             "\nseqs present:", paste(names(aln), collapse=" "), 
-                             "\n", sep="")
-            stop(myError)
-        }
-    }
-    
-    #### check no repeated seq names in each argument
-    if (length(pop1seqs) != length(unique(pop1seqs))) {
-        stop("ERROR - there are one or more repeated names in the pop1seqs argument\n\n")    
-    }
-    if (length(pop2seqs) != length(unique(pop2seqs))) {
-        stop("ERROR - there are one or more repeated names in the pop2seqs argument\n\n")    
-    }
-    if (length(unlist(outgroupSeqs)) != length(unique(unlist(outgroupSeqs)))) {
-        stop("ERROR - there are one or more repeated names in the outgroupSeqs argument\n\n")
-    }
     
     #### reorder alignment
     seqOrder <- c(pop1seqs, pop2seqs)
@@ -941,8 +1001,11 @@ doMKtest <- function(myAlnFile=NULL,
         if(sum(internalCodonTests)>0) {
             failedTests <- which(internalCodonTests)
             stop("\n\nERROR - there are problem codon(s) where there are no non-stop, non-gap, non-N containing codons.\n",
-                 "Position(s) of problem codons are: ",failedTests,
-                 "\nAll codons found at those positions are ",aln_codonsUnique[failedTests],"\n\n")
+                 "Position(s) of problem codons are: ",
+                 paste(failedTests, collapse=","),
+                 "\nAll codons found at those positions are: ",
+                 paste(aln_codonsUnique[failedTests], collapse=","),
+                 "\n\n")
         }
         ## the stop codon must be at the end - we can strip it out
         warning("this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon\n\n")
@@ -1007,7 +1070,7 @@ doMKtest <- function(myAlnFile=NULL,
     aln_split["pop1_and_pop2"] <- BStringSetList(c(aln_split[["pop1"]], aln_split[["pop2"]]))
     
     #### get each extant codon in each group
-    ## after Dec 9 2022, we remove N-containing codons from the returned codons (I changed alnSlicesUniqueSeqs function)
+    ## after Dec 9 2022, I remove N-containing codons from the returned codons (I changed alnSlicesUniqueSeqs function)
     aln_split_codonsUnique <- lapply(aln_split, function(x) {
         alnSlicesUniqueSeqs(x)
     })
@@ -1022,14 +1085,25 @@ doMKtest <- function(myAlnFile=NULL,
         alnSlicesUniqueSeqs(x, sliceWidth=1)
     })
     aln_split_PositionsUnique_withoutNsGaps <- lapply(aln_split_PositionsUnique, function(x) {
-        lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
+        uniqueNucs <- lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
+        ## check for positions where there are no non-gap characters
+        numNonGapsEachPos <- sapply(uniqueNucs, length)
+        if(sum(numNonGapsEachPos==0)>0) {
+            gapPositions <- which(numNonGapsEachPos==0)
+            gapPositions <- paste(gapPositions, collapse=",")
+            my_warning <- paste("there are nucleotide positions where (in one population) every sequence has a gap or N. Positions: ",
+                                gapPositions,"\n\n")
+            warning("\n\nWARNING - ", my_warning)
+            # stop("\n\nERROR - ", my_warning)
+        }
+        return(uniqueNucs)
     })
-    
+    ## get nucleotides at each position in outgroups, if applicable
     if(!is.null(outgroupSeqs)) {
-        outgroups_aln_split_PositionsUnique <- lapply(outgroups_aln_split, 
-                                                      function(x) {
-                                                          alnSlicesUniqueSeqs(x, sliceWidth=1)
-                                                      })
+        outgroups_aln_split_PositionsUnique <- lapply(
+            outgroups_aln_split, function(x) {
+                alnSlicesUniqueSeqs(x, sliceWidth=1)
+            })
     }
     
     #### infer ancestors (including uncertainty)
