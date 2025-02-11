@@ -2,7 +2,7 @@ example_script_MKtest.Rmd
 ================
 Janet Young
 
-2025-01-13
+2025-02-10
 
 # Load Janet’s MK functions
 
@@ -78,7 +78,7 @@ MKresults_websiteExample <- doMKtest(
 ```
 
     ## 
-    ## ##### reading alignment from file /Volumes/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa 
+    ## ##### reading alignment from file /fh/fast/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa 
     ##     splitting alignment into groups and tabulating nucleotides
 
     ## Warning in doMKtest(myAlnFile = alnFile, pop1seqs = pongo_names, pop2seqs = trachy_names): this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
@@ -125,7 +125,7 @@ pop1_vs_pop2_Dn
 input
 </td>
 <td style="text-align:left;">
-/Volumes/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa
+/fh/fast/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa
 </td>
 </tr>
 <tr>
@@ -368,7 +368,7 @@ non-synonymous
 </tbody>
 </table>
 
-And here it is transposed (I prefer this:)
+And here it is transposed (I prefer this):
 
 ``` r
 showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
@@ -416,8 +416,10 @@ fixed
 </tbody>
 </table>
 
-Here’s the first 6 rows of the `positions` output table, transposed to a
-single column for easier viewing
+Here’s the first 6 rows of the `positions` output table. It’s mostly for
+troubleshooting code - it’s more detail than most users need, although
+if you want to dig into which codons contain changes, this would be one
+way to do it.
 
 ``` r
 MKresults_websiteExample[["positions"]] %>% 
@@ -1288,10 +1290,6 @@ NA
 </tbody>
 </table>
 
-The positions table is mostly for troubleshooting code - it’s more
-detail than most users need, although if you want to dig into which
-codons contain changes, this would be one way to do it.
-
 ## Saving results to Excel
 
 Now, we do the same MK test but save the results in an Excel file (we
@@ -1414,6 +1412,12 @@ nnk_MKresults_polarized <- doMKtest(
     quiet=TRUE )
 ```
 
+    ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  685,686,687
+
+    ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  238,239,240,241,242,243,478,479,480,481,482,483,595,596,597,598,599,600,601,602,603,604,605,606,709,710,711,712,713,714,715,716,717,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789
+    ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  238,239,240,241,242,243,478,479,480,481,482,483,595,596,597,598,599,600,601,602,603,604,605,606,709,710,711,712,713,714,715,716,717,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789
+    ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  238,239,240,241,242,243,478,479,480,481,482,483,595,596,597,598,599,600,601,602,603,604,605,606,709,710,711,712,713,714,715,716,717,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789
+
 # Combining results from multiple tests
 
 If we’ve performed more than one MK test, we can combine the results
@@ -1456,6 +1460,155 @@ temp <- plotMKpositions(nnk_MKresults_polarized[["positions"]],
 
 ![](example_script_MKtest_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
+## Notes on gap positions
+
+Gap characters (- and N/n) are not counted as evolutionary changes for
+the MK test, even though some of them might be real indel mutations. For
+the standard MK test, we only care about ‘traditional’ synonymous and
+non-synonymous changes.
+
+Before Feb 2025, my code couldn’t handle situations where one or more
+codons had gap positions in every member of one of the populations. Now
+it can.
+
+But sometimes we want to do a little more with the gaps:
+
+### Remove nucleotide positions where every member of a population has gaps
+
+Read example file (some positions have gaps in all members of one
+population):
+
+``` r
+alnWithGapsFile <- here("test_data/testData_for_troubleshooting/test_otherMiscProblemAlns/test_onePopAllGaps.fa")
+alnWithGaps <- readBStringSet(alnWithGapsFile)
+names(alnWithGaps) <- sapply(strsplit(names(alnWithGaps), " "), "[[", 1)
+alnWithGapsSpecies <- gsub("\\d","",names(alnWithGaps))
+alnWithGapsPopulations <- split(names(alnWithGaps), alnWithGapsSpecies)
+```
+
+``` r
+alnWithGaps_small <- narrow(alnWithGaps, start=1, end=45)
+alnWithGaps_small
+```
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]    45 ATGGATGTCACCCGC---CTCCTGGCC---CTGCTGGTCTTCCTC     pongo1
+    ## [2]    45 ATGGATGTCACCCGC---CTCCTGGCC---CTGCTGGTCTTCCTC     pongo2
+    ## [3]    45 ATGGATGTCACCCGCCTACTCCTGGCCACCCTGCTGGTC---CTC     trachy1
+    ## [4]    45 ATGGATGTCACCCGCCTACTCCTGGCCACCCTGCTGGTC---CTC     trachy2
+
+You can use the `removeEntirePopulationGapsFromAln` function (found in
+`scripts/MKfunctions_utilities.R`) to get rid of those positions before
+analysis:
+
+``` r
+removeEntirePopulationGapsFromAln(alnWithGaps_small,
+                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+```
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]    36 ATGGATGTCACCCGCCTCCTGGCCCTGCTGGTCCTC              pongo1
+    ## [2]    36 ATGGATGTCACCCGCCTCCTGGCCCTGCTGGTCCTC              pongo2
+    ## [3]    36 ATGGATGTCACCCGCCTCCTGGCCCTGCTGGTCCTC              trachy1
+    ## [4]    36 ATGGATGTCACCCGCCTCCTGGCCCTGCTGGTCCTC              trachy2
+
+The `removeEntirePopulationGapsFromAln` function includes a very crude
+check and warning if the number of positions to be removed is divisible
+by 3 (if not, the alignment is probably going to change reading frame).
+This won’t pick up situations where the total number of gaps is still
+divisible by 3, but they comprise separate smaller frameshifting gaps.
+
+Example of frameshifting gaps:
+
+``` r
+alnWithGaps_small_frameshiftingGap <- alnWithGaps_small
+subseq(alnWithGaps_small_frameshiftingGap[["pongo1"]], start=19, end=19) <- BString("-")
+subseq(alnWithGaps_small_frameshiftingGap[["pongo2"]], start=19, end=19) <- BString("-")
+alnWithGaps_small_frameshiftingGap
+```
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]    45 ATGGATGTCACCCGC----TCCTGGCC---CTGCTGGTCTTCCTC     pongo1
+    ## [2]    45 ATGGATGTCACCCGC----TCCTGGCC---CTGCTGGTCTTCCTC     pongo2
+    ## [3]    45 ATGGATGTCACCCGCCTACTCCTGGCCACCCTGCTGGTC---CTC     trachy1
+    ## [4]    45 ATGGATGTCACCCGCCTACTCCTGGCCACCCTGCTGGTC---CTC     trachy2
+
+``` r
+removeEntirePopulationGapsFromAln(alnWithGaps_small_frameshiftingGap,
+                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+```
+
+    ## Warning: population pop1 had 7 positions that are gaps in every sequence.
+    ## This is NOT a multiple of three - degapping MIGHT make the alignment go out of frame
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]    35 ATGGATGTCACCCGCTCCTGGCCCTGCTGGTCCTC               pongo1
+    ## [2]    35 ATGGATGTCACCCGCTCCTGGCCCTGCTGGTCCTC               pongo2
+    ## [3]    35 ATGGATGTCACCCGCTCCTGGCCCTGCTGGTCCTC               trachy1
+    ## [4]    35 ATGGATGTCACCCGCTCCTGGCCCTGCTGGTCCTC               trachy2
+
+### Tidy up a very gappy alignment
+
+Sometimes alignments (e.g. large alignments obtained from PopFly)
+contain positions where most sequences contain a gap or an N. These can
+cause frameshifts. Sometimes we want to get rid of those.
+
+Biostrings has a function called `maskGaps` that can do that, but it
+works on `DNAMultipleAlignment` objects rather than `BStringSet`
+objects.
+
+Make an example input alignment. Positions 4-12 are gaps in all but one
+sequence, so uninformative.
+
+``` r
+alnWithMajorityGaps <- aln
+gap_positions <- 4:12
+for(i in gap_positions) {
+    for(each_seq in names(alnWithMajorityGaps)[2:length(alnWithMajorityGaps)] )
+    subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
+}
+alnWithMajorityGaps
+```
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]   399 ATGGATGTCACCCGCCTACTCCT...GCGTGCTCAGCCTCAACTGCTGA pongo1
+    ## [2]   399 ATG---------CGCCTACTCCT...GCGTGCTCAGCCTCAACTGCTGA pongo2
+    ## [3]   399 ATG---------CGCCTACTCCT...GCGTGCTCAGCCTCAACTGCTGA trachy1
+    ## [4]   399 ATG---------CGCCTACTCCT...GCGTGCTCAGCCTCAACTGTTGA trachy2
+
+degapNucAln is a wrapper function to remove columns that are entirely
+gap (or, change the `fractionOfSeqsWithGap` option to not require EVERY
+sequence to contain a gap)
+
+``` r
+degapNucAln <- function(myAln, fractionOfSeqsWithGap=1) {
+    maskedAln <- myAln %>%
+        DNAMultipleAlignment() %>%
+        maskGaps(min.fraction=fractionOfSeqsWithGap,
+                 min.block.width=1) %>%
+        BStringSet()
+    return(maskedAln)
+}
+```
+
+``` r
+degapNucAln(alnWithMajorityGaps, fractionOfSeqsWithGap=0.5)
+```
+
+    ## BStringSet object of length 4:
+    ##     width seq                                               names               
+    ## [1]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGCTGA pongo1
+    ## [2]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGCTGA pongo2
+    ## [3]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGCTGA trachy1
+    ## [4]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGTTGA trachy2
+
 # Finished
 
 Show sessionInfo, to record package versions in case we need to do any
@@ -1465,28 +1618,32 @@ troubleshooting.
 sessionInfo()
 ```
 
-    ## R version 4.4.2 (2024-10-31)
-    ## Platform: aarch64-apple-darwin20
-    ## Running under: macOS Sequoia 15.2
+    ## R version 4.4.0 (2024-04-24)
+    ## Platform: x86_64-pc-linux-gnu
+    ## Running under: Ubuntu 18.04.6 LTS
     ## 
     ## Matrix products: default
-    ## BLAS:   /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib 
-    ## LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.0
+    ## BLAS/LAPACK: FlexiBLAS OPENBLAS;  LAPACK version 3.11.0
     ## 
     ## locale:
-    ## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+    ##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+    ##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+    ##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+    ##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+    ##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+    ## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
     ## 
     ## time zone: America/Los_Angeles
-    ## tzcode source: internal
+    ## tzcode source: system (glibc)
     ## 
     ## attached base packages:
     ## [1] stats4    stats     graphics  grDevices utils     datasets  methods  
     ## [8] base     
     ## 
     ## other attached packages:
-    ##  [1] openxlsx_4.2.7.1    Biostrings_2.74.0   GenomeInfoDb_1.42.1
-    ##  [4] XVector_0.46.0      IRanges_2.40.1      S4Vectors_0.44.0   
-    ##  [7] BiocGenerics_0.52.0 kableExtra_1.4.0    lubridate_1.9.4    
+    ##  [1] openxlsx_4.2.5.2    Biostrings_2.72.0   GenomeInfoDb_1.40.0
+    ##  [4] XVector_0.44.0      IRanges_2.38.0      S4Vectors_0.42.0   
+    ##  [7] BiocGenerics_0.50.0 kableExtra_1.4.0    lubridate_1.9.3    
     ## [10] forcats_1.0.0       stringr_1.5.1       dplyr_1.1.4        
     ## [13] purrr_1.0.2         readr_2.1.5         tidyr_1.3.1        
     ## [16] tibble_3.2.1        ggplot2_3.5.1       tidyverse_2.0.0    
@@ -1494,18 +1651,18 @@ sessionInfo()
     ## 
     ## loaded via a namespace (and not attached):
     ##  [1] utf8_1.2.4              generics_0.1.3          xml2_1.3.6             
-    ##  [4] stringi_1.8.4           hms_1.1.3               digest_0.6.37          
-    ##  [7] magrittr_2.0.3          evaluate_1.0.1          grid_4.4.2             
-    ## [10] timechange_0.3.0        fastmap_1.2.0           jsonlite_1.8.9         
+    ##  [4] stringi_1.8.4           hms_1.1.3               digest_0.6.35          
+    ##  [7] magrittr_2.0.3          evaluate_0.23           grid_4.4.0             
+    ## [10] timechange_0.3.0        fastmap_1.2.0           jsonlite_1.8.8         
     ## [13] rprojroot_2.0.4         zip_2.3.1               httr_1.4.7             
-    ## [16] fansi_1.0.6             UCSC.utils_1.2.0        viridisLite_0.4.2      
-    ## [19] scales_1.3.0            cli_3.6.3               crayon_1.5.3           
-    ## [22] rlang_1.1.4             munsell_0.5.1           withr_3.0.2            
-    ## [25] yaml_2.3.10             tools_4.4.2             tzdb_0.4.0             
-    ## [28] colorspace_2.1-1        GenomeInfoDbData_1.2.13 vctrs_0.6.5            
-    ## [31] R6_2.5.1                lifecycle_1.0.4         zlibbioc_1.52.0        
-    ## [34] pkgconfig_2.0.3         pillar_1.9.0            gtable_0.3.6           
-    ## [37] Rcpp_1.0.13-1           glue_1.8.0              systemfonts_1.1.0      
-    ## [40] xfun_0.49               tidyselect_1.2.1        rstudioapi_0.17.1      
-    ## [43] knitr_1.49              htmltools_0.5.8.1       rmarkdown_2.29         
-    ## [46] svglite_2.1.3           compiler_4.4.2
+    ## [16] fansi_1.0.6             UCSC.utils_1.0.0        viridisLite_0.4.2      
+    ## [19] scales_1.3.0            cli_3.6.2               crayon_1.5.2           
+    ## [22] rlang_1.1.4             munsell_0.5.1           withr_3.0.0            
+    ## [25] yaml_2.3.8              tools_4.4.0             tzdb_0.4.0             
+    ## [28] colorspace_2.1-0        GenomeInfoDbData_1.2.12 vctrs_0.6.5            
+    ## [31] R6_2.5.1                lifecycle_1.0.4         zlibbioc_1.50.0        
+    ## [34] pkgconfig_2.0.3         pillar_1.9.0            gtable_0.3.5           
+    ## [37] Rcpp_1.0.12             glue_1.7.0              systemfonts_1.1.0      
+    ## [40] highr_0.10              xfun_0.44               tidyselect_1.2.1       
+    ## [43] rstudioapi_0.16.0       knitr_1.46              htmltools_0.5.8.1      
+    ## [46] rmarkdown_2.26          svglite_2.1.3           compiler_4.4.0

@@ -1,7 +1,7 @@
 require(Biostrings)
 require(here)
 
-## 
+
 scripts_dir <- here("scripts/")
 if(!dir.exists(scripts_dir)) {
     stop("\n\nERROR - fix scripts/MKfunctions.R to tell it the correct location of the scripts/ directory\n\n")
@@ -1338,3 +1338,6 @@ doMKtest <- function(myAlnFile=NULL,
     }
     return(list(summary=finalOutputTable, positions=positionTable))
 }
+
+
+

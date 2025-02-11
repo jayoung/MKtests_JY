@@ -90,7 +90,7 @@ showContingencyTable(MKresults_websiteExample[["summary"]]) %>%
     kable_styling()
 ```
 
-And here it is transposed (I prefer this:)
+And here it is transposed (I prefer this):
 
 ```{r}
 showContingencyTable(MKresults_websiteExample[["summary"]]) %>% 
@@ -100,9 +100,7 @@ showContingencyTable(MKresults_websiteExample[["summary"]]) %>%
 ```
 
 
-
-
-Here's the first 6 rows of the `positions` output table, transposed to a single column for easier viewing
+Here's the first 6 rows of the `positions` output table. It's mostly for troubleshooting code - it's more detail than most users need, although if you want to dig into which codons contain changes, this would be one way to do it.
 
 ```{r}
 MKresults_websiteExample[["positions"]] %>% 
@@ -112,7 +110,6 @@ MKresults_websiteExample[["positions"]] %>%
     kable_styling()
 ```
 
-The positions table is mostly for troubleshooting code - it's more detail than most users need, although if you want to dig into which codons contain changes, this would be one way to do it.
 
 ## Saving results to Excel
 
@@ -228,6 +225,98 @@ temp <- plotMKpositions(nnk_MKresults_polarized[["positions"]],
                         plotPolarizedPop1=TRUE, plotPolarizedPop2=TRUE, 
                         pop1alias="Dmel", pop2alias="Dsim")
 ```
+
+
+## Notes on gap positions
+
+Gap characters (- and N/n) are not counted as evolutionary changes for the MK test, even though some of them might be real indel mutations. For the standard MK test, we only care about 'traditional' synonymous and non-synonymous changes.
+
+Before Feb 2025, my code couldn't handle situations where one or more codons had gap positions in every member of one of the populations. Now it can.
+
+But sometimes we want to do a little more with the gaps:
+
+### Remove nucleotide positions where every member of a population has gaps
+
+Read example file (some positions have gaps in all members of one population):
+
+```{r}
+alnWithGapsFile <- here("test_data/testData_for_troubleshooting/test_otherMiscProblemAlns/test_onePopAllGaps.fa")
+alnWithGaps <- readBStringSet(alnWithGapsFile)
+names(alnWithGaps) <- sapply(strsplit(names(alnWithGaps), " "), "[[", 1)
+alnWithGapsSpecies <- gsub("\\d","",names(alnWithGaps))
+alnWithGapsPopulations <- split(names(alnWithGaps), alnWithGapsSpecies)
+```
+
+```{r}
+alnWithGaps_small <- narrow(alnWithGaps, start=1, end=45)
+alnWithGaps_small
+```
+
+You can use the `removeEntirePopulationGapsFromAln` function (found in `scripts/MKfunctions_utilities.R`) to get rid of those positions before analysis:
+
+```{r}
+removeEntirePopulationGapsFromAln(alnWithGaps_small,
+                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+```
+
+The `removeEntirePopulationGapsFromAln` function includes a very crude check and warning if the number of positions to be removed is divisible by 3 (if not, the alignment is probably going to change reading frame).  This won't pick up situations where the total number of gaps is still divisible by 3, but they comprise separate smaller frameshifting gaps.
+
+Example of frameshifting gaps:
+
+```{r}
+alnWithGaps_small_frameshiftingGap <- alnWithGaps_small
+subseq(alnWithGaps_small_frameshiftingGap[["pongo1"]], start=19, end=19) <- BString("-")
+subseq(alnWithGaps_small_frameshiftingGap[["pongo2"]], start=19, end=19) <- BString("-")
+alnWithGaps_small_frameshiftingGap
+```
+
+```{r}
+removeEntirePopulationGapsFromAln(alnWithGaps_small_frameshiftingGap,
+                                  pop1seqs=alnWithGapsPopulations[["pongo"]],
+                                  pop2seqs=alnWithGapsPopulations[["trachy"]])
+```
+
+
+
+
+### Tidy up a very gappy alignment
+
+Sometimes alignments (e.g. large alignments obtained from PopFly) contain positions where most sequences contain a gap or an N. These can cause frameshifts. Sometimes we want to get rid of those. 
+
+Biostrings has a function called `maskGaps` that can do that, but it works on `DNAMultipleAlignment` objects rather than `BStringSet` objects. 
+
+Make an example input alignment. Positions 4-12 are gaps in all but one sequence, so uninformative.
+
+```{r}
+alnWithMajorityGaps <- aln
+gap_positions <- 4:12
+for(i in gap_positions) {
+    for(each_seq in names(alnWithMajorityGaps)[2:length(alnWithMajorityGaps)] )
+    subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
+}
+alnWithMajorityGaps
+```
+
+degapNucAln is a wrapper function to remove columns that are entirely gap (or, change the `fractionOfSeqsWithGap` option to not require EVERY sequence to contain a gap)
+
+```{r}
+degapNucAln <- function(myAln, fractionOfSeqsWithGap=1) {
+    maskedAln <- myAln %>%
+        DNAMultipleAlignment() %>%
+        maskGaps(min.fraction=fractionOfSeqsWithGap,
+                 min.block.width=1) %>%
+        BStringSet()
+    return(maskedAln)
+}
+```
+
+```{r}
+degapNucAln(alnWithMajorityGaps, fractionOfSeqsWithGap=0.5)
+```
+
+
+
 
 
 # Finished

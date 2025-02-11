@@ -275,3 +275,56 @@ showContingencyTable <- function(summaryTable) {
     output
 }
 
+
+
+###### removeEntirePopulationGapsFromAln - a utility function that removes positions that are ENTIRELY gaps in one or other population from the entire alignment. I'm not actually using this
+## xx do I want to RECORD how many positions were removed? and which ones? 
+removeEntirePopulationGapsFromAln <- function(aln, 
+                                              pop1seqs=NULL, pop2seqs=NULL,
+                                              outgroupSeqs=NULL ) {
+    ## check inputs look OK
+    checkAlignmentAndPopulationNames(aln, 
+                                     pop1seqs=pop1seqs, pop2seqs=pop2seqs,
+                                     outgroupSeqs=outgroupSeqs)
+    
+    ## get a list that has aln for each population
+    alns_each_pop <- list()
+    if(!is.null(pop1seqs)) { alns_each_pop[["pop1"]] <- aln[pop1seqs] }
+    if(!is.null(pop2seqs)) { alns_each_pop[["pop2"]] <- aln[pop2seqs] }
+    if(!is.null(outgroupSeqs)) { alns_each_pop[["outgroups"]] <- aln[outgroupSeqs] }
+    
+    ## DETECT gaps using each population individually
+    gapsToRemove <- lapply(names(alns_each_pop), function(each_popname) {
+        
+        aln_one_pop_df <- strsplit(as.character(alns_each_pop[[each_popname]]), "") %>% 
+            as.data.frame()
+        all_gap_tests <- apply(aln_one_pop_df, 1, function(x) {
+            sum(!x %in% c("N","n","-")) == 0
+        })
+        all_gap_positions <- which(all_gap_tests)
+        ## check that num gaps is a multiple of three
+        if ((length(all_gap_positions) %% 3) != 0) {
+            warning(
+                "population ", each_popname, 
+                " had ", length(all_gap_positions), " positions that are gaps in every sequence.\n",
+                "This is NOT a multiple of three - degapping MIGHT make the alignment go out of frame\n\n",
+                call. =FALSE)
+        }
+        return(all_gap_positions)
+        
+    })
+    names(gapsToRemove) <- names(alns_each_pop)
+    
+    ## REMOVE gaps in ANY population from the entire alignment
+    allGaps <- unlist(gapsToRemove, use.names = FALSE)
+    allGaps_ir <- IRanges(start=allGaps, end=allGaps)
+    allGaps_ir <- as(allGaps_ir, "NormalIRanges")
+    maskedAln <- DNAMultipleAlignment(aln, colmask = allGaps_ir) 
+    newAln <- maskedAln %>% BStringSet()
+    return(newAln)
+}
+
+# removeEntirePopulationGapsFromAln(alnWithGaps_small_badGap, 
+#                                   pop1seqs=alnWithGapsPopulations[["pongo"]],
+#                                   pop2seqs=alnWithGapsPopulations[["trachy"]])
+
