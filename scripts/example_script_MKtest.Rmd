@@ -60,8 +60,6 @@ trachy_names
 Do the MK test - simplest example:
 
 ```{r}
-source(here("scripts/MKfunctions.R"))
-
 MKresults_websiteExample <- doMKtest(
     myAln=aln, 
     pop1seqs=pongo_names, 

@@ -12,7 +12,7 @@ Also loads the Biostrings package.
 source(here("scripts/MKfunctions.R"))
 ```
 
-# Read in alignment, figure out sequence groupings
+# Read in alignment file, figure out sequence groupings
 
 Read in alignment file, and fix the seqnames to remove descriptions.
 
@@ -72,16 +72,14 @@ Do the MK test - simplest example:
 
 ``` r
 MKresults_websiteExample <- doMKtest(
-    myAlnFile=alnFile, 
+    myAln=aln, 
     pop1seqs=pongo_names, 
     pop2seqs=trachy_names)
 ```
 
-    ## 
-    ## ##### reading alignment from file /fh/fast/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa 
     ##     splitting alignment into groups and tabulating nucleotides
 
-    ## Warning in doMKtest(myAlnFile = alnFile, pop1seqs = pongo_names, pop2seqs = trachy_names): this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
+    ## Warning in doMKtest(myAln = aln, pop1seqs = pongo_names, pop2seqs = trachy_names): this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
 
     ##     looking at allele frequencies
     ##     inferring ancestors
@@ -125,7 +123,7 @@ pop1_vs_pop2_Dn
 input
 </td>
 <td style="text-align:left;">
-/fh/fast/malik_h/user/jayoung/MKtest/MKtests_JY/test_data/MKTwebsiteExample/MKTwebsite_testAln.fa
+BStringSet
 </td>
 </tr>
 <tr>
