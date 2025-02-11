@@ -22,7 +22,7 @@ source(here("scripts/MKfunctions.R"))
 ```
 
 
-# Read in alignment, figure out sequence groupings
+# Read in alignment file, figure out sequence groupings
 
 Read in alignment file, and fix the seqnames to remove descriptions.
 
@@ -34,6 +34,7 @@ alnFile <- here("test_data/MKTwebsiteExample/MKTwebsite_testAln.fa")
 aln <- readBStringSet(alnFile)
 aln
 ```
+
 At first when we read in the alignment, sequence names also contain a description ("gi|909919..."): those are messy so I strip them off:
 
 ```{r}
@@ -59,15 +60,17 @@ trachy_names
 Do the MK test - simplest example:
 
 ```{r}
+source(here("scripts/MKfunctions.R"))
+
 MKresults_websiteExample <- doMKtest(
-    myAlnFile=alnFile, 
+    myAln=aln, 
     pop1seqs=pongo_names, 
     pop2seqs=trachy_names)
 ```
 
 The output of the doMKtest function (here, stored in the `MKresults_websiteExample` object) is a list, comprising two tables:      
-- list element 1 ("summary")  contains the MK test results.   
-- list element 2 ("positions")   contains a per-position analysis of the alignment, wihch helps understand what's going on with the alignment, and/or with troubleshooting.   
+- list element 1 ("summary") contains the MK test results.   
+- list element 2 ("positions") contains a per-position analysis of the alignment, wihch helps understand what's going on with the alignment, and/or with troubleshooting.   
 
 
 Here's the `summary` table, transposed to a single column for easier viewing. The results are at the bottom, with a record of the input dataset and parameters used at the top.

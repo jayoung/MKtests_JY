@@ -826,7 +826,7 @@ checkAlignmentAndPopulationNames <- function(aln,
 # (b) run it on a BSStringSet alignment
 
 # myAlnFile: a fasta file, in-frame alignment
-# myAln: a BSStringSet alignment (must also specify outfileStem)
+# myAln: a BSStringSet alignment (can also specify outfileStem, for use if writeMKoutput=TRUE and/or if writeAncFasta=TRUE)
 
 # pop1seqs: character vector, names of sequences in first population (e.g. mel)
 # pop2seqs: character vector, names of sequence(s) in second population (e.g. sim)
@@ -869,8 +869,10 @@ doMKtest <- function(myAlnFile=NULL,
     }
     if(!is.null(myAln)) {
         if(class(myAln) != "BStringSet") {stop("\n\nERROR - myAln should be a BStringSet object\n\n")}
-        if(is.null(outfileStem)) {
-            stop("\n\nERROR - when using the doMKtests function on a BStringSet object, must also specify the outfileStem argument\n\n")
+        if(writeMKoutput | writeAncFasta) {
+            if(is.null(outfileStem)) {
+                stop("\n\nERROR - when using the doMKtests function on a BStringSet object, must also specify the outfileStem argument, if we want writeMKoutput=TRUE or writeAncFasta=TRUE\n\n")
+            }
         }
     }
     if (!combiningApproach %in% c("mean","conservative","conservativeOld") ) {
