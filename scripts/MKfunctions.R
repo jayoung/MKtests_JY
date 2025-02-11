@@ -168,10 +168,17 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter,
     }
     # make sure all codons are in the table
     checkCodons <- unique(codonsJoined[differentCodons])
+    if(length(checkCodons)==0) { 
+        ## xx do I want a warning here?  This is what happens if a codon contains only gap alleles
+        return(outputIfWeFindStopCodons) 
+    }
+    
+    # return(checkCodons) ## xxx  temp - debug
     if (sum(!checkCodons %in% paths[,"path"])>0) {
         problemCodonPositions <- which(!checkCodons %in% paths[,"path"])
         missingCodons <- checkCodons[which(!checkCodons %in% paths[,"path"])]
-        stop("ERROR - found a codon combination missing from the paths table, probably contains a stop codon: ",missingCodons," at position ",problemCodonPositions,"\n\n")
+        stop("ERROR - found a codon combination missing from the paths table, probably contains a stop codon: ",
+             missingCodons, " at position ", problemCodonPositions, "\n\n")
     }
     
     pathsRows <- match( codonsJoined[differentCodons], paths[,"path"] )
@@ -209,10 +216,10 @@ getCodonChangeCountsFromCodonList <- function(codonListBefore, codonListAfter,
     }
     
     if(sum(stopCodons %in% codonListBefore) > 0) {
-        stop("\n\nERRR in getCodonChangeCountsFromCodonList - there are stop codon(s) in codonListBefore\n\n")
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - there are stop codon(s) in codonListBefore\n\n")
     }
     if(sum(stopCodons %in% codonListAfter) > 0) {
-        stop("\n\nERRR in getCodonChangeCountsFromCodonList - there are stop codon(s) in codonListAfter\n\n")
+        stop("\n\nERROR in getCodonChangeCountsFromCodonList - there are stop codon(s) in codonListAfter\n\n")
     }
     
     ### get counts, one codon position at a time
@@ -1093,7 +1100,7 @@ doMKtest <- function(myAlnFile=NULL,
             gapPositions <- paste(gapPositions, collapse=",")
             my_warning <- paste("there are nucleotide positions where (in one population) every sequence has a gap or N. Positions: ",
                                 gapPositions,"\n\n")
-            warning("\n\nWARNING - ", my_warning)
+            warning(my_warning, call. = FALSE)
             # stop("\n\nERROR - ", my_warning)
         }
         return(uniqueNucs)
@@ -1178,17 +1185,18 @@ doMKtest <- function(myAlnFile=NULL,
     }
     #### make a table showing what's going on with each alignment position
     if(!quiet) { cat("    starting output table\n") }
+    # browser() ### for debugging
     positionTable <- data.frame(
         pos=1:numNT + nucleotideOffsetForOutput, 
         codon=rep(1:numCodons, each=3) + codonOffsetForOutput,
         codon_pos=rep(1:3,numCodons),
         pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
         #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
-        pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)!=1,
+        pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)>1,
         pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
         pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
         #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
-        pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)!=1,
+        pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)>1,
         pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
     positionTable[,"fixed_difference"] <- positionTable[,"pop1_anc"] != positionTable[,"pop2_anc"] # not quite want I want, probably ?
     
@@ -1222,6 +1230,8 @@ doMKtest <- function(myAlnFile=NULL,
     
     ### unpolarized fixed changes:
     if(!quiet) { cat("    categorizing population 1 vs 2 fixed changes\n") }
+    ### xxx this is REALLY where it breaks
+    # browser() ### for debugging
     pop1_vs_pop2fixedCounts <- getCodonChangeCountsFromCodonList(
         pop1_anc_withUncert_codons, 
         pop2_anc_withUncert_codons, 

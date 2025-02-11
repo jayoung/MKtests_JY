@@ -142,13 +142,46 @@ MKresults[["summary"]] %>%
 
 
 ```{r}
+source(here("scripts/MKfunctions.R"))
+# getCodonChangeCounts("GTA","CTA")
+# getCodonChangeCounts("---","CTA")
+```
+
+```{r}
+## expected output when list has 1 position
+source(here("scripts/MKfunctions.R"))
+getCodonChangeCountsFromCodonList(
+        list("GTA"), 
+        list("CTA"))
+```
+
+
+```{r}
+## expected output when list has >1 position
+getCodonChangeCountsFromCodonList(
+        list("GTA","GTT"), 
+        list("CTA","GTT"))
+```
+
+
+```{r}
+## this is the core of the problem:
+getCodonChangeCountsFromCodonList(
+        list("---"), 
+        list("CTA"))
+```
+
+
+
+```{r}
 # debug(doMKtest)
 source(here("scripts/MKfunctions.R"))
 MKresults <- doMKtest(alnWithGapsFile, 
                       pop1seqs=alnWithGapsPopulations[["pongo"]],
                       pop2seqs=alnWithGapsPopulations[["trachy"]],
-                      regionStartAA=6, regionEndAA=6,
-                      quiet=FALSE, extraVerbose=TRUE)
+                      # regionStartAA=6, regionEndAA=6,
+                      quiet=FALSE, extraVerbose=FALSE)
+MKresults[["summary"]]
 # undebug(doMKtest)
 ```
 
