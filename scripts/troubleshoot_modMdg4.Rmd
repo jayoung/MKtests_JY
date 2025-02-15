@@ -1,0 +1,158 @@
+---
+title: "example_script_MKtest.Rmd"
+author: "Janet Young\n"
+date: "`r Sys.Date()`\n"
+output: github_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(kableExtra)
+```
+
+# Load Janet's MK functions
+
+Also loads the Biostrings package. 
+
+```{r, warning=FALSE, message=FALSE}
+source(here("scripts/MKfunctions.R"))
+
+#### degapNucAln - function to remove columns that are entirely gap (or can use fractionOfSeqsWithGap to relax requirements of how many seqs have gap)
+degapNucAln <- function(myAln, fractionOfSeqsWithGap=1) {
+    maskedAln <- myAln %>% 
+        DNAMultipleAlignment() %>% 
+        maskGaps(min.fraction=fractionOfSeqsWithGap, 
+                 min.block.width=1) %>% 
+        DNAStringSet()
+    return(maskedAln)
+}
+```
+
+# Read in alignment
+
+```{r}
+## original aln has 1325bp, 1117 seqs (1 simulans, 1116 melanogaster)
+aln <- readBStringSet(here("data/mod_mdg4/modmdg4_alignment.fasta"))
+aln
+## Check names are unique - they are
+# length(names(aln))
+# length(unique(names(aln)))
+```
+
+
+first fix the gap positions. Remove any position where >50% seqs have gap. Now we have 1207bp aln (still 1117 seqs)
+
+```{r}
+aln_degap <- degapNucAln(aln, fractionOfSeqsWithGap = 0.5)
+aln_degap
+```
+
+
+Then trim to get rid of the last partial codon (end at 1206, not 1207, to be a multiple of 3)
+
+```{r}
+aln_degap_trim <- narrow(aln_degap, start=1, end=1206) %>% 
+    BStringSet()
+```
+
+
+
+Get population names
+
+```{r}
+sim_names <- grep("simulans", names(aln), value=TRUE)
+mel_names <- grep("simulans", names(aln), value=TRUE, invert=TRUE)
+```
+
+Do the MK test. It works now!  I still wasn't handling the gap positions correctly.
+
+```{r}
+MK_results <- doMKtest(myAln=aln_degap_trim, 
+                       pop1seqs=mel_names,
+                       pop2seqs=sim_names,
+                       quiet=FALSE, extraVerbose=FALSE)
+```
+
+
+# Results summary
+
+Don't get excited about the p-values: the NI (neutrality index) is 4.46, indicating strong NEGATIVE selection (=purifying).  There's not as many fixed non-synonymous changes as you'd expect (given the polymorphisms as a proxy for neutrality).
+
+The number of sequences tested is a bit misleading, because there are quite a lot of seqs in this alignment that are all-N.  We coule eliminate those.
+
+```{r}
+MK_results[["summary"]] %>% 
+    select(-input) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling(full_width = FALSE)
+```
+
+# Contingency table
+
+```{r}
+showContingencyTable(MK_results[["summary"]]) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling(full_width = FALSE)
+```
+
+# Eliminate N-heavy seqs
+
+```{r}
+each_seq_split <- as.character(aln_degap_trim) %>% 
+    strsplit(split="") 
+each_seq_Ncounts <- sapply( each_seq_split, function(x) {
+    sum(x=="N")
+} )
+aln_degap_trim_removeNseqs <- aln_degap_trim[ which(each_seq_Ncounts < 100) ]
+```
+
+Show histogram of num Ns per sequence
+
+```{r}
+tibble(id=names(each_seq_Ncounts),
+       num_Ns=each_seq_Ncounts) %>% 
+    ggplot(aes(x=num_Ns)) +
+    geom_histogram(binwidth=10)
+```
+
+Run MK test on alignment without the very N-heavy sequences. Turns out results are not changed very much (the Ns were treated as gaps, so didn't count as changes). A total of 5 polymorphisms (out of 112) went away (probably seq errors or rare SNPs in the N-heavy sequences)
+
+```{r}
+mel_names_v2 <- grep("simulans", names(aln_degap_trim_removeNseqs), value=TRUE, invert=TRUE)
+MK_results_v2 <- doMKtest(myAln=aln_degap_trim_removeNseqs, 
+                       pop1seqs=mel_names_v2,
+                       pop2seqs=sim_names,
+                       quiet=FALSE, extraVerbose=FALSE)
+```
+
+
+```{r}
+MK_results_v2[["summary"]] %>% 
+    select(-input) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling(full_width = FALSE)
+```
+
+
+
+```{r}
+showContingencyTable(MK_results_v2[["summary"]]) %>% 
+    t() %>% 
+    kable() %>% 
+    kable_styling(full_width = FALSE)
+```
+
+# Finished - show version info
+
+```{r}
+sessionInfo()
+```
+
+
+

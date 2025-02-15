@@ -27,7 +27,8 @@ load(paste(scripts_dir, "codonPaths/codonPathsFromBioperl.Rdata", sep=""))
 # ingroupName(s) e.g. "mel" or "sim"
 # orderedOutgroupNames e.g. "sim" or c("sim", "out")
 
-reconstructAncestor <- function(aln_tables, aln_df, fixed_nucs, seqGroups, ingroupNames, orderedOutgroupNames) {
+reconstructAncestor <- function(aln_tables, aln_df, fixed_nucs, 
+                                seqGroups, ingroupNames, orderedOutgroupNames) {
     numNT <- dim(aln_tables[[1]])[2]
     anc <- rep("?", numNT)
     
@@ -132,9 +133,19 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter,
         stop("ERROR - codonsBefore and codonsAfter are different lengths\n\n")    
     }
     if (extraVerbose) {
-        cat("codonsBefore", codonsBefore,"\n")
-        cat("codonsAfter", codonsAfter,"\n")
+        cat("## in getCodonChangeCounts function\n")
+        cat("   codonsBefore", codonsBefore,"\n")
+        cat("   codonsAfter", codonsAfter,"\n")
     }
+    ## look for no valid codons (e.g. if there are only gaps in one population)
+    if(length(codonsBefore)==0 | length(codonsAfter)==0 ) {
+        # cat("\n        NOTE from getCodonChangeCounts function. One population has only gap codons. Using zero counts for this codon\n\n")
+        outputIfOnlyGaps <- data.frame(codon=1, 
+                                       before="---", after="---",
+                                       ns=0, s=0, tot=0 )
+        return(outputIfOnlyGaps)
+    }
+    
     ## make sure we have at least one non-stop codon
     outputIfWeFindStopCodons <- data.frame(codon=1:length(codonsBefore), 
                                            before=codonsBefore, 
@@ -142,6 +153,8 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter,
                                            ns=0,
                                            s=0,
                                            tot=0 )
+    
+    ## look for only stop codons
     codonsBeforeWithoutStops <- setdiff(codonsBefore, stopCodons)
     codonsAfterWithoutStops <- setdiff(codonsAfter, stopCodons)
     if(length(codonsBeforeWithoutStops)==0 | length(codonsAfterWithoutStops)==0 ) {
@@ -151,25 +164,44 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter,
     
     nsCountsEachCodon <- rep(NA,length(codonsBefore))
     sCountsEachCodon <- rep(NA,length(codonsBefore))
-    
-    ## the easy case is identical codons (even if they contain - but if one contains "?" I will NOT call them identical)
-    identicalCodons <- which(codonsBefore==codonsAfter & 
-                                 !grepl("?", codonsBefore, fixed=TRUE)  & 
-                                 !grepl("?", codonsAfter, fixed=TRUE) )
-    nsCountsEachCodon[identicalCodons] <- 0
-    sCountsEachCodon[identicalCodons] <- 0
+    ## concatenate
     codonsJoined <- paste(codonsBefore, codonsAfter, sep="")
     
+    ## the easy case is identical codons (even if they contain - but if one contains "?" I will NOT call them identical)
+    codonsDiffer <- codonsBefore!=codonsAfter & 
+        !grepl("[-N\\?]", codonsJoined, perl=TRUE, ignore.case=TRUE)
+    identicalCodons <- which(!codonsDiffer)
+    # identicalCodons <- which(codonsBefore==codonsAfter & 
+    #                              !grepl("?", codonsBefore, fixed=TRUE)  & 
+    #                              !grepl("?", codonsAfter, fixed=TRUE) )
+    nsCountsEachCodon[identicalCodons] <- 0
+    sCountsEachCodon[identicalCodons] <- 0
+    
+    
+    ## codons with gaps - also those get 0 counts
+    ## xxx this might be messing things up??
+    # gapCodons <- which(grepl("-", codonsJoined, fixed=TRUE))
+    # nsCountsEachCodon[gapCodons] <- 0
+    # sCountsEachCodon[gapCodons] <- 0
+    
     ## codons that differ and are unambiguous, and we can get counts for those
-    differentCodons <- which(codonsBefore!=codonsAfter & 
-                                 !grepl("[-N\\?]", codonsJoined, perl=TRUE, ignore.case=TRUE))
-    if(extraVerbose) {
-        cat("checking codonsJoined ",codonsJoined,"\n\n")
-    }
+    # differentCodons <- which(
+    #     codonsBefore!=codonsAfter & 
+    #         !grepl("[-N\\?]", codonsJoined, perl=TRUE, ignore.case=TRUE))
+    differentCodons <- which(codonsDiffer)
     # make sure all codons are in the table
     checkCodons <- unique(codonsJoined[differentCodons])
+    ## remove any codon combinations with gaps - can't use those 
+    # checkCodons <- grep("-", checkCodons, invert=TRUE, value=TRUE)
+    
+    if(extraVerbose) {
+        cat("   checking codonsJoined ",checkCodons,"\n\n")
+    }
     if(length(checkCodons)==0) { 
         ## xx do I want a warning here?  This is what happens if a codon contains only gap alleles
+        if(extraVerbose) {
+            warning("there were no valid codons remaining. Exiting the getCodonChangeCounts function\n\n")
+        }
         return(outputIfWeFindStopCodons) 
     }
     
@@ -190,7 +222,7 @@ getCodonChangeCounts <- function(codonsBefore, codonsAfter,
                          ns=nsCountsEachCodon,
                          s=sCountsEachCodon,
                          tot= (nsCountsEachCodon+sCountsEachCodon) )
-    
+    if(extraVerbose) { cat("   finished getCodonChangeCounts function\n") }
     return(output)
     
     ## xx maybe do something with codons that contain ?
@@ -649,19 +681,24 @@ makeCodonsFromSeqAsListWithUncertainty <- function(mylist,
                 }
             }
         }
-        if(!is.null(allCodonVariants)) {
+        if(!is.null(allCodonVariants) & length(allCodonVariants)>0) {
             if(length(setdiff(allCodonVariants, excludeStopCodons))==0) {
-                cat("all codons",allCodonVariants,"\n")
-                cat("non-stop codons",setdiff(allCodonVariants, excludeStopCodons),"\n")
-                errorMsg <- "\n\nERROR"
+                if(extraVerbose) {
+                    cat("nucs",unlist(nucs),"\n")
+                    cat("all codons",allCodonVariants,"\n")
+                    cat("non-stop codons",setdiff(allCodonVariants, excludeStopCodons),"\n")
+                }
+                # errorMsg <- "\n\nERROR"
+                errorMsg <- ""
                 if (!is.null(populationTag)) {
                     errorMsg <- paste(errorMsg, " in population ", populationTag, sep="")
                 }
                 errorMsg <- paste(errorMsg, 
                                   ", in codon ",i,
-                                  " - all codon possibilities are stop codons - that's odd\n\n", 
+                                  " - all codon possibilities are stop or gap codons - that's odd\n\n", 
                                   sep="")
-                stop(errorMsg)
+                ## this used to stop() meaning I could not analyze positions where one entire population has a gap.  Changing it to be just a warning
+                warning(errorMsg, call.=FALSE)
             }
             allCodonVariants <- setdiff(allCodonVariants, excludeStopCodons)
         }
@@ -754,31 +791,8 @@ checkAlignmentAndPopulationNames <- function(aln,
                  checked[["missing_seqs"]], "\n\n")
         }
     })
-    # 
-    # 
-    # if(!is.null(pop1seqs)) {
-    #     checked <- checkAllSeqnamesInAln(aln,pop1seqs)
-    #     if(checked[["error"]]){
-    #         stop("\n\nERROR - some seqnames in pop1 are missing from the alignment: ",
-    #              checked[["missing_seqs"]], "\n\n")
-    #     }
-    # }
-    # if(!is.null(pop2seqs)) {
-    #     checked <- checkAllSeqnamesInAln(aln,pop2seqs)
-    #     if(checked[["error"]]){
-    #         stop("\n\nERROR - some seqnames in pop2 are missing from the alignment: ",
-    #              checked[["missing_seqs"]], "\n\n")
-    #     }
-    # }
-    # if(!is.null(outgroupSeqs)) {
-    #     checked <- checkAllSeqnamesInAln(aln,outgroupSeqs)
-    #     if(checked[["error"]]){
-    #         stop("\n\nERROR - some seqnames in the outgroup list are missing from the alignment: ",
-    #              checked[["missing_seqs"]], "\n\n")
-    #     }
-    # }
-
-        ## check names in different populations don't overlap:
+    
+    ## check names in different populations don't overlap:
     if(length(intersect(pop1seqs, pop2seqs))>0) {
         overlap_seqs <- intersect(pop1seqs, pop2seqs)
         overlap_seqs <- paste(overlap_seqs, collapse=",")
@@ -850,12 +864,13 @@ doMKtest <- function(myAlnFile=NULL,
                      pop1alias=NULL, pop2alias=NULL,
                      polarize=FALSE, outgroupSeqs=NULL,
                      combiningApproach="conservative", 
-                     filterRareAlleles=FALSE, flagRareAlleles=FALSE, alleleFreqThreshold=0,
+                     filterRareAlleles=FALSE, flagRareAlleles=FALSE, 
+                     alleleFreqThreshold=0,
                      regionStartAA=NULL, regionEndAA=NULL,
                      writeAncFasta=FALSE, writeMKoutput=FALSE,
                      quiet=FALSE, extraVerbose=FALSE) {
     
-    ### some checks
+    ### some checks on alignment input
     if(is.null(myAln) & is.null(myAlnFile)) {
         stop("\n\nERROR in doMKtest - must specify either the name of an alignment file, or a BStringSet alignment object\n\n")
     }
@@ -904,13 +919,19 @@ doMKtest <- function(myAlnFile=NULL,
     ## make sure everything is upper case
     aln <- BStringSet(toupper(aln))
     
-    
-    
+    ## it would make no sense if the user doesn't supply pop1seqs and pop2seqs
+    if(is.null(pop1seqs)) {
+        stop("\n\nERROR - you have to supply seqnames for population 1 in the pop1seqs argument\n\n")
+    }
+    if(is.null(pop2seqs)) {
+        stop("\n\nERROR - you have to supply seqnames for population 2 in the pop1seqs argument\n\n")
+    }
+
     ## we're expecting outgroup seqs to be a list (to allow hierarchy of outgroups) but maybe the user wanted to keep it simple and specify just a character vector:
     if (class(outgroupSeqs)=="character") {
         outgroupSeqs <- list(outgroup1=outgroupSeqs)
     }
-    
+
     ## check all specified sequences are in the alignment. It will stop() with an ERROR message if not.
     outgroupSeqsToTest <- outgroupSeqs
     if(class(outgroupSeqsToTest) == "list") {
@@ -1093,25 +1114,41 @@ doMKtest <- function(myAlnFile=NULL,
     aln_split_PositionsUnique <- lapply(aln_split, function(x) {
         alnSlicesUniqueSeqs(x, sliceWidth=1)
     })
-    aln_split_PositionsUnique_withoutNsGaps <- lapply(aln_split_PositionsUnique, function(x) {
-        uniqueNucs <- lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
-        ## check for positions where there are no non-gap characters
-        numNonGapsEachPos <- sapply(uniqueNucs, length)
-        if(sum(numNonGapsEachPos==0)>0) {
-            gapPositions <- which(numNonGapsEachPos==0)
-            gapPositions <- paste(gapPositions, collapse=",")
-            my_warning <- paste("there are nucleotide positions where (in one population) every sequence has a gap or N. Positions: ",
-                                gapPositions,"\n\n")
-            warning(my_warning, call. = FALSE)
-            # stop("\n\nERROR - ", my_warning)
-        }
-        return(uniqueNucs)
-    })
+    aln_split_PositionsUnique_withoutNsGaps <- lapply(
+        aln_split_PositionsUnique, function(x) {
+            uniqueNucs <- lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
+            ## check for positions where there are no non-gap characters
+            numNonGapsEachPos <- sapply(uniqueNucs, length)
+            if(sum(numNonGapsEachPos==0)>0) {
+                gapPositions <- which(numNonGapsEachPos==0)
+                gapPositions <- paste(gapPositions, collapse=",")
+                my_warning <- paste("there are nucleotide positions where (in one population) every sequence has a gap or N. Positions: ",
+                                    gapPositions,"\n\n")
+                warning(my_warning, call. = FALSE)
+                # stop("\n\nERROR - ", my_warning)
+            }
+            return(uniqueNucs)
+        })
     ## get nucleotides at each position in outgroups, if applicable
     if(!is.null(outgroupSeqs)) {
         outgroups_aln_split_PositionsUnique <- lapply(
             outgroups_aln_split, function(x) {
                 alnSlicesUniqueSeqs(x, sliceWidth=1)
+            })
+        outgroups_aln_split_PositionsUnique_withoutNsGaps <- lapply(
+            outgroups_aln_split_PositionsUnique, function(x) {
+                uniqueNucs <- lapply(x, function(y) { y[ which(!y %in% c("N","-"))] } )
+                ## check for positions where there are no non-gap characters
+                numNonGapsEachPos <- sapply(uniqueNucs, length)
+                if(sum(numNonGapsEachPos==0)>0) {
+                    gapPositions <- which(numNonGapsEachPos==0)
+                    gapPositions <- paste(gapPositions, collapse=",")
+                    my_warning <- paste("there are nucleotide positions where (in the outgroup population) every sequence has a gap or N. Positions: ",
+                                        gapPositions,"\n\n")
+                    warning(my_warning, call. = FALSE)
+                    # stop("\n\nERROR - ", my_warning)
+                }
+                return(uniqueNucs)
             })
     }
     
@@ -1122,29 +1159,35 @@ doMKtest <- function(myAlnFile=NULL,
     if(!quiet) { cat("    inferring ancestors\n") }
     outgroupsForPop1 <- list(aln_split_PositionsUnique[["pop2"]])
     if (!is.null(outgroupSeqs)) {
-        outgroupsForPop1 <- c(outgroupsForPop1, outgroups_aln_split_PositionsUnique)
+        outgroupsForPop1 <- c(outgroupsForPop1, 
+                              outgroups_aln_split_PositionsUnique_withoutNsGaps)
     }
     outgroupsForPop2 <- list(aln_split_PositionsUnique[["pop1"]])
     if (!is.null(outgroupSeqs)) {
-        outgroupsForPop2 <- c(outgroupsForPop2, outgroups_aln_split_PositionsUnique)
+        outgroupsForPop2 <- c(outgroupsForPop2, 
+                              outgroups_aln_split_PositionsUnique_withoutNsGaps)
     }
     if(extraVerbose) {cat("        pop1\n")}
     pop1_anc_withUncert <- reconstructAncestor_includeUncertainty(
-        ingroup=aln_split_PositionsUnique[["pop1"]], 
+        # ingroup=aln_split_PositionsUnique[["pop1"]], 
+        ingroup=aln_split_PositionsUnique_withoutNsGaps[["pop1"]], 
         outgroups=outgroupsForPop1,
         extraVerbose=extraVerbose )
-    pop1_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop1_anc_withUncert,
-                                                                         extraVerbose=extraVerbose, 
-                                                                         populationTag="pop1_anc")
+    pop1_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(
+        pop1_anc_withUncert,
+        extraVerbose=extraVerbose, 
+        populationTag="pop1_anc")
     
     if(extraVerbose) {cat("        pop2\n")}
     pop2_anc_withUncert <- reconstructAncestor_includeUncertainty(
-        ingroup=aln_split_PositionsUnique[["pop2"]], 
+        # ingroup=aln_split_PositionsUnique[["pop2"]], 
+        ingroup=aln_split_PositionsUnique_withoutNsGaps[["pop2"]], 
         outgroups=outgroupsForPop2,
         extraVerbose=extraVerbose )
-    pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(pop2_anc_withUncert,
-                                                                         extraVerbose=extraVerbose, 
-                                                                         populationTag="pop2_anc")
+    pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(
+        pop2_anc_withUncert,
+        extraVerbose=extraVerbose, 
+        populationTag="pop2_anc")
     
     ### if we are polarizing, get the ancestor to pop1 and pop2 using outgroups
     if (polarize) {
@@ -1155,7 +1198,8 @@ doMKtest <- function(myAlnFile=NULL,
         if(extraVerbose) {cat("        pop1and2\n")}
         pop1_and_pop2_anc_withUncert <- reconstructAncestor_includeUncertainty(
             ingroup=pop1_and_pop2_ancs, 
-            outgroups=list(aln_split_PositionsUnique[["out"]]),
+            # outgroups=list(aln_split_PositionsUnique[["out"]]),
+            outgroups=list(aln_split_PositionsUnique_withoutNsGaps[["out"]]),
             extraVerbose=extraVerbose)
         pop1_and_pop2_anc_withUncert_codons <- makeCodonsFromSeqAsListWithUncertainty(
             pop1_and_pop2_anc_withUncert,
@@ -1194,12 +1238,16 @@ doMKtest <- function(myAlnFile=NULL,
         codon_pos=rep(1:3,numCodons),
         pop1_anc=sapply(pop1_anc_withUncert, paste, collapse=" "), 
         #pop1_poly=sapply(aln_split_PositionsUnique[["pop1"]], length)!=1,
+        # pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
         pop1_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]], length)>1,
-        pop1_num_alleles=sapply(aln_split_PositionsUnique[["pop1"]], length),
+        pop1_num_alleles=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop1"]],
+                                length),
         pop2_anc=sapply(pop2_anc_withUncert, paste, collapse=" "),
         #pop2_poly=sapply(aln_split_PositionsUnique[["pop2"]], length)!=1,
+        # pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
         pop2_poly=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]], length)>1,
-        pop2_num_alleles=sapply(aln_split_PositionsUnique[["pop2"]], length))
+        pop2_num_alleles=sapply(aln_split_PositionsUnique_withoutNsGaps[["pop2"]],
+                                length)   )
     positionTable[,"fixed_difference"] <- positionTable[,"pop1_anc"] != positionTable[,"pop2_anc"] # not quite want I want, probably ?
     
     if(polarize) { 
@@ -1217,10 +1265,12 @@ doMKtest <- function(myAlnFile=NULL,
     
     ## adds allele counts and frequencies to positionTable
     positionTable <- addCountsToTable(positionTable, aln_tables[["pop1"]], "pop1")
-    positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop1"]], "pop1", transpose=FALSE)
+    positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop1"]],
+                                      "pop1", transpose=FALSE)
     
     positionTable <- addCountsToTable(positionTable, aln_tables[["pop2"]], "pop2")
-    positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop2"]], "pop2", transpose=FALSE)
+    positionTable <- addCountsToTable(positionTable, aln_tables_majorMinor[["pop2"]],
+                                      "pop2", transpose=FALSE)
     if(!is.null(outgroupSeqs)) {
         positionTable <- addCountsToTable(positionTable, aln_tables[["out"]], "out")
     }
@@ -1232,31 +1282,37 @@ doMKtest <- function(myAlnFile=NULL,
     
     ### unpolarized fixed changes:
     if(!quiet) { cat("    categorizing population 1 vs 2 fixed changes\n") }
-    ### xxx this is REALLY where it breaks
-    # browser() ### for debugging
+    if(extraVerbose) { cat("       HERE1\n") }
     pop1_vs_pop2fixedCounts <- getCodonChangeCountsFromCodonList(
         pop1_anc_withUncert_codons, 
         pop2_anc_withUncert_codons, 
         combiningApproach=combiningApproach, 
         extraVerbose=extraVerbose)
-    
+    if(extraVerbose) { cat("       HERE2\n") }
     positionTable <- addFixedCountsToNucPositionTable(positionTable, 
                                                       pop1_vs_pop2fixedCounts,
                                                       outputColPrefix="pop1_vs_pop2")
+    if(extraVerbose) { cat("       HERE3\n") }
     
     ### categorizes the (pop1) polymorphisms, adding pop1_Pn and pop1_Ps to positionTable
     if(!quiet) { cat("    categorizing polymorphisms\n") }
-    pop1_polyCounts <- categorizePolymorphisms_new_byCodon(pop1_anc_withUncert_codons, 
-                                                           aln_split_PositionsUnique[["pop1"]],
-                                                           combiningApproach=combiningApproach,
-                                                           extraVerbose = extraVerbose)
+    if(!quiet) { cat("        categorizing polymorphisms pop1\n") }
+    pop1_polyCounts <- categorizePolymorphisms_new_byCodon(
+        pop1_anc_withUncert_codons, 
+        # aln_split_PositionsUnique[["pop1"]],
+        aln_split_PositionsUnique_withoutNsGaps[["pop1"]],
+        combiningApproach=combiningApproach,
+        extraVerbose = extraVerbose)
     colnames(pop1_polyCounts) <- paste("pop1", colnames(pop1_polyCounts), sep="_")
     positionTable <- cbind(positionTable, pop1_polyCounts)
     
-    pop2_polyCounts <- categorizePolymorphisms_new_byCodon(pop2_anc_withUncert_codons, 
-                                                           aln_split_PositionsUnique[["pop2"]],
-                                                           combiningApproach=combiningApproach,
-                                                           extraVerbose = extraVerbose)
+    if(!quiet) { cat("        categorizing polymorphisms pop2\n") }
+    pop2_polyCounts <- categorizePolymorphisms_new_byCodon(
+        pop2_anc_withUncert_codons, 
+        # aln_split_PositionsUnique[["pop2"]],
+        aln_split_PositionsUnique_withoutNsGaps[["pop2"]],
+        combiningApproach=combiningApproach,
+        extraVerbose = extraVerbose)
     colnames(pop2_polyCounts) <- paste("pop2", colnames(pop2_polyCounts), sep="_")
     positionTable <- cbind(positionTable, pop2_polyCounts)
     
@@ -1275,9 +1331,10 @@ doMKtest <- function(myAlnFile=NULL,
             print (pop1_and_pop2_anc_to_pop1_FixedCounts)
             cat("\n")
         }
-        positionTable <- addFixedCountsToNucPositionTable(positionTable, 
-                                                          pop1_and_pop2_anc_to_pop1_FixedCounts,
-                                                          "pop1_polarized")
+        positionTable <- addFixedCountsToNucPositionTable(
+            positionTable, 
+            pop1_and_pop2_anc_to_pop1_FixedCounts,
+            "pop1_polarized")
         
         #### polarized, pop2 branch:
         if(extraVerbose) {
@@ -1292,9 +1349,10 @@ doMKtest <- function(myAlnFile=NULL,
             print (pop1_and_pop2_anc_to_pop2_FixedCounts)
             cat("\n")
         }
-        positionTable <- addFixedCountsToNucPositionTable(positionTable, 
-                                                          pop1_and_pop2_anc_to_pop2_FixedCounts,
-                                                          "pop2_polarized")
+        positionTable <- addFixedCountsToNucPositionTable(
+            positionTable, 
+            pop1_and_pop2_anc_to_pop2_FixedCounts,
+            "pop2_polarized")
         
         positionTable[,"total_polarized_Dn"] <- positionTable[,"pop1_polarized_Dn"] + 
             positionTable[,"pop2_polarized_Dn"] 
@@ -1306,9 +1364,22 @@ doMKtest <- function(myAlnFile=NULL,
     MKtable <- MKoutput(positionTable, polarize=polarize)
     
     ## another table that has more info in it, for checking purposes
-    if(!quiet) {cat("        seqs_not_used",seqs_not_used,"\n")}
     if (length(seqs_not_used)==0) {seqs_not_used <- ""}
-    if (length(seqs_not_used)>1) {seqs_not_used <- paste(seqs_not_used, collapse=",")}
+    if (length(seqs_not_used)>1) {    
+        ## message to screen about seqs_not_used
+        if(!quiet) {
+            seqs_not_used_for_message <- seqs_not_used
+            if (length(seqs_not_used)>10) {
+                seqs_not_used_for_message <- seqs_not_used_for_message[1:10]
+            }
+            seqs_not_used_for_message <- paste(seqs_not_used_for_message, collapse=",")
+            cat("        seqs_not_used (first 10): ",
+                seqs_not_used_for_message,
+                " ....\n")
+        }
+        ## concatenate all seqs_not_used for the output table
+        seqs_not_used <- paste(seqs_not_used, collapse=",")
+    }
     inputName <- "BStringSet"
     if(!is.null(myAlnFile)) {inputName <- myAlnFile}
     finalOutputTable <- data.frame( input=inputName, 
@@ -1332,6 +1403,7 @@ doMKtest <- function(myAlnFile=NULL,
     finalOutputTable[,"first_pop1_seq"] <- pop1seqs[1]
     finalOutputTable[,"first_pop2_seq"] <- pop2seqs[1]
     finalOutputTable <- cbind(finalOutputTable, MKtable)
+    rownames(finalOutputTable) <- NULL
     
     if(writeMKoutput) {
         writeOneMKtestToExcel(finalOutputTable, positionTable, outfileMK,
