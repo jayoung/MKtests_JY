@@ -2,7 +2,7 @@ example_script_MKtest.Rmd
 ================
 Janet Young
 
-2025-02-14
+2025-02-27
 
 # Load Janet’s MK functions
 
@@ -26,7 +26,7 @@ degapNucAln <- function(myAln, fractionOfSeqsWithGap=1) {
 
 ``` r
 ## original aln has 1325bp, 1117 seqs (1 simulans, 1116 melanogaster)
-aln <- readBStringSet(here("data/mod_mdg4/modmdg4_alignment.fasta"))
+aln <- readBStringSet(here("data/mod_mdg4/from_Sage/2025_02_14/originals/modmdg4_alignment.fasta"))
 aln
 ```
 
@@ -393,7 +393,7 @@ tibble(id=names(each_seq_Ncounts),
     geom_histogram(binwidth=10)
 ```
 
-![](troubleshoot_modMdg4_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](troubleshoot_modMdg4_files/figure-gfm/show%20N%20histogram-1.png)<!-- -->
 
 Run MK test on alignment without the very N-heavy sequences. Turns out
 results are not changed very much (the Ns were treated as gaps, so
