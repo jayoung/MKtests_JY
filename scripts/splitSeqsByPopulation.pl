@@ -74,11 +74,21 @@ foreach my $file (@ARGV) {
         my $pop = $seqname;
         #my $pop = "ED19-1-3_ChrX_(reversed)"; ## test
         #print "    pop before $pop\n";
+
+        ## strip off _Chr... at the end
         $pop =~ s/_Chr.+?$//;
+
+        ## strip off hyphen plus anything after
         $pop =~ s/-.*$//; # the * is a greedy pattern match - maximizes length of matched string (whereas the ? after Chr above minimizes, not that it matters for Chr which I choose. Here we are greedy to make sure we match the first hyphen
+
+        ## strip off A or B or N at the end
         $pop =~ s/[ABN]$//;
+
+        ## strip off digits at the end
         $pop =~ s/\d+?$//;
         #$pop =~ s/-$//;
+
+        ## strip off underscore at the end
         $pop =~ s/_$//;
         #print "    pop after $pop\n";
         #die;

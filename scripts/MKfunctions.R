@@ -858,8 +858,9 @@ checkAlignmentAndPopulationNames <- function(aln,
 # regionStartAA / regionEndAA (default=NULL) - can specify a codon position to start and end the analysis at
 
 doMKtest <- function(myAlnFile=NULL, 
-                     myAln=NULL, outfileStem=NULL,
-                     outDir=NULL, 
+                     myAln=NULL, 
+                     myAlnID=NULL, # this will go in the "input" column
+                     outfileStem=NULL, outDir=NULL, 
                      pop1seqs=NULL, pop2seqs=NULL, 
                      pop1alias=NULL, pop2alias=NULL,
                      polarize=FALSE, outgroupSeqs=NULL,
@@ -1382,6 +1383,7 @@ doMKtest <- function(myAlnFile=NULL,
     }
     inputName <- "BStringSet"
     if(!is.null(myAlnFile)) {inputName <- myAlnFile}
+    if(!is.null(myAlnID)) {inputName <- myAlnID}
     finalOutputTable <- data.frame( input=inputName, 
                                     num_seqs=numSeqs,
                                     num_seqs_pop1=length(pop1seqs),

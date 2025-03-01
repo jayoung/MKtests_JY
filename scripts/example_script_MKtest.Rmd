@@ -62,6 +62,8 @@ Do the MK test - simplest example:
 ```{r}
 MKresults_websiteExample <- doMKtest(
     myAln=aln, 
+    ## can supply a name for the aln that'll go in 'input' column of the summary table:
+    myAlnID="websiteExample",  
     pop1seqs=pongo_names, 
     pop2seqs=trachy_names)
 ```
@@ -213,9 +215,9 @@ Plot for the simple primate example:
 
 ```{r, fig.height=2, fig.width=7}
 temp <- plotMKpositions(MKresults_websiteExample[["positions"]], 
-                title="MKresults websiteExample", 
-                pop1alias="pongo", pop2alias="trachy", 
-                setNumPlots=FALSE)
+                        title="MKresults websiteExample", 
+                        pop1alias="pongo", pop2alias="trachy", 
+                        setNumPlots=FALSE)
 ```
 
 Plot for polarized data, Nicknack example:
@@ -294,7 +296,7 @@ alnWithMajorityGaps <- aln
 gap_positions <- 4:12
 for(i in gap_positions) {
     for(each_seq in names(alnWithMajorityGaps)[2:length(alnWithMajorityGaps)] )
-    subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
+        subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
 }
 alnWithMajorityGaps
 ```
@@ -316,7 +318,15 @@ degapNucAln <- function(myAln, fractionOfSeqsWithGap=1) {
 degapNucAln(alnWithMajorityGaps, fractionOfSeqsWithGap=0.5)
 ```
 
+Note that 
+```{r}
+alnWithMajorityGaps_MKresult <- doMKtest(myAln=alnWithMajorityGaps, 
+                                         myAlnID="alnWithMajorityGaps",
+                                         pop1seqs=pongo_names, 
+                                         pop2seqs=trachy_names)
 
+alnWithMajorityGaps_MKresult[["summary"]]
+```
 
 
 

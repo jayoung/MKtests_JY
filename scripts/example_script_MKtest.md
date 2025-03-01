@@ -2,7 +2,7 @@ example_script_MKtest.Rmd
 ================
 Janet Young
 
-2025-02-10
+2025-02-28
 
 # Load Janet’s MK functions
 
@@ -73,21 +73,24 @@ Do the MK test - simplest example:
 ``` r
 MKresults_websiteExample <- doMKtest(
     myAln=aln, 
+    ## can supply a name for the aln that'll go in 'input' column of the summary table:
+    myAlnID="websiteExample",  
     pop1seqs=pongo_names, 
     pop2seqs=trachy_names)
 ```
 
     ##     splitting alignment into groups and tabulating nucleotides
 
-    ## Warning in doMKtest(myAln = aln, pop1seqs = pongo_names, pop2seqs = trachy_names): this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
+    ## Warning in doMKtest(myAln = aln, myAlnID = "websiteExample", pop1seqs = pongo_names, : this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
 
     ##     looking at allele frequencies
     ##     inferring ancestors
     ##     starting output table
     ##     categorizing population 1 vs 2 fixed changes
     ##     categorizing polymorphisms
+    ##         categorizing polymorphisms pop1
+    ##         categorizing polymorphisms pop2
     ##     doing MK tests
-    ##         seqs_not_used
 
 The output of the doMKtest function (here, stored in the
 `MKresults_websiteExample` object) is a list, comprising two tables:  
@@ -113,7 +116,6 @@ MKresults_websiteExample[["summary"]] %>%
 <th style="text-align:left;">
 </th>
 <th style="text-align:left;">
-pop1_vs_pop2_Dn
 </th>
 </tr>
 </thead>
@@ -123,7 +125,7 @@ pop1_vs_pop2_Dn
 input
 </td>
 <td style="text-align:left;">
-BStringSet
+websiteExample
 </td>
 </tr>
 <tr>
@@ -1416,6 +1418,8 @@ nnk_MKresults_polarized <- doMKtest(
     ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  238,239,240,241,242,243,478,479,480,481,482,483,595,596,597,598,599,600,601,602,603,604,605,606,709,710,711,712,713,714,715,716,717,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789
     ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  238,239,240,241,242,243,478,479,480,481,482,483,595,596,597,598,599,600,601,602,603,604,605,606,709,710,711,712,713,714,715,716,717,775,776,777,778,779,780,781,782,783,784,785,786,787,788,789
 
+    ## Warning: there are nucleotide positions where (in the outgroup population) every sequence has a gap or N. Positions:  685,686,687
+
 # Combining results from multiple tests
 
 If we’ve performed more than one MK test, we can combine the results
@@ -1440,9 +1444,9 @@ Plot for the simple primate example:
 
 ``` r
 temp <- plotMKpositions(MKresults_websiteExample[["positions"]], 
-                title="MKresults websiteExample", 
-                pop1alias="pongo", pop2alias="trachy", 
-                setNumPlots=FALSE)
+                        title="MKresults websiteExample", 
+                        pop1alias="pongo", pop2alias="trachy", 
+                        setNumPlots=FALSE)
 ```
 
 ![](example_script_MKtest_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
@@ -1569,7 +1573,7 @@ alnWithMajorityGaps <- aln
 gap_positions <- 4:12
 for(i in gap_positions) {
     for(each_seq in names(alnWithMajorityGaps)[2:length(alnWithMajorityGaps)] )
-    subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
+        subseq(alnWithMajorityGaps[[each_seq]], start=i, end=i) <- BString("-")
 }
 alnWithMajorityGaps
 ```
@@ -1607,6 +1611,50 @@ degapNucAln(alnWithMajorityGaps, fractionOfSeqsWithGap=0.5)
     ## [3]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGCTGA trachy1
     ## [4]   390 ATGCGCCTACTCCTGGCCACCCT...GCGTGCTCAGCCTCAACTGTTGA trachy2
 
+Note that
+
+``` r
+alnWithMajorityGaps_MKresult <- doMKtest(myAln=alnWithMajorityGaps, 
+                                         myAlnID="alnWithMajorityGaps",
+                                         pop1seqs=pongo_names, 
+                                         pop2seqs=trachy_names)
+```
+
+    ##     splitting alignment into groups and tabulating nucleotides
+
+    ## Warning in doMKtest(myAln = alnWithMajorityGaps, myAlnID = "alnWithMajorityGaps", : this alignment has a codon at the end with only stop codons - we will strip it out and not count any changes in this codon
+
+    ##     looking at allele frequencies
+
+    ## Warning: there are nucleotide positions where (in one population) every sequence has a gap or N. Positions:  4,5,6,7,8,9,10,11,12
+
+    ##     inferring ancestors
+    ##     starting output table
+    ##     categorizing population 1 vs 2 fixed changes
+    ##     categorizing polymorphisms
+    ##         categorizing polymorphisms pop1
+    ##         categorizing polymorphisms pop2
+    ##     doing MK tests
+
+``` r
+alnWithMajorityGaps_MKresult[["summary"]]
+```
+
+    ##                 input num_seqs num_seqs_pop1 num_seqs_pop2 num_seqs_outgroup
+    ## 1 alnWithMajorityGaps        4             2             2                 0
+    ##   seqs_not_used length_NT length_AA region_start_coord_codons
+    ## 1                     396       132                         1
+    ##   region_end_coord_codons filter_rare_alleles rare_allele_freq_threshold
+    ## 1                     132               FALSE                          0
+    ##   parameter_combining_approach first_pop1_seq first_pop2_seq
+    ## 1                 conservative         pongo1        trachy1
+    ##   pop1_vs_pop2_chiSq_pVal pop1_vs_pop2_FET_pVal pop1_vs_pop2_Dn pop1_vs_pop2_Ds
+    ## 1               0.1184649             0.2307692               5               5
+    ##   pop1_vs_pop2_Pn pop1_vs_pop2_Ps pop1_vs_pop2_NI pop1_vs_pop2_alpha
+    ## 1               0               3               0                  1
+    ##   pop1_vs_pop2_result
+    ## 1          not signif
+
 # Finished
 
 Show sessionInfo, to record package versions in case we need to do any
@@ -1641,26 +1689,26 @@ sessionInfo()
     ## other attached packages:
     ##  [1] openxlsx_4.2.5.2    Biostrings_2.72.0   GenomeInfoDb_1.40.0
     ##  [4] XVector_0.44.0      IRanges_2.38.0      S4Vectors_0.42.0   
-    ##  [7] BiocGenerics_0.50.0 kableExtra_1.4.0    lubridate_1.9.3    
+    ##  [7] BiocGenerics_0.50.0 kableExtra_1.4.0    lubridate_1.9.4    
     ## [10] forcats_1.0.0       stringr_1.5.1       dplyr_1.1.4        
-    ## [13] purrr_1.0.2         readr_2.1.5         tidyr_1.3.1        
+    ## [13] purrr_1.0.4         readr_2.1.5         tidyr_1.3.1        
     ## [16] tibble_3.2.1        ggplot2_3.5.1       tidyverse_2.0.0    
     ## [19] here_1.0.1         
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] utf8_1.2.4              generics_0.1.3          xml2_1.3.6             
-    ##  [4] stringi_1.8.4           hms_1.1.3               digest_0.6.35          
-    ##  [7] magrittr_2.0.3          evaluate_0.23           grid_4.4.0             
-    ## [10] timechange_0.3.0        fastmap_1.2.0           jsonlite_1.8.8         
-    ## [13] rprojroot_2.0.4         zip_2.3.1               httr_1.4.7             
-    ## [16] fansi_1.0.6             UCSC.utils_1.0.0        viridisLite_0.4.2      
-    ## [19] scales_1.3.0            cli_3.6.2               crayon_1.5.2           
-    ## [22] rlang_1.1.4             munsell_0.5.1           withr_3.0.0            
-    ## [25] yaml_2.3.8              tools_4.4.0             tzdb_0.4.0             
-    ## [28] colorspace_2.1-0        GenomeInfoDbData_1.2.12 vctrs_0.6.5            
-    ## [31] R6_2.5.1                lifecycle_1.0.4         zlibbioc_1.50.0        
-    ## [34] pkgconfig_2.0.3         pillar_1.9.0            gtable_0.3.5           
-    ## [37] Rcpp_1.0.12             glue_1.7.0              systemfonts_1.1.0      
-    ## [40] highr_0.10              xfun_0.44               tidyselect_1.2.1       
-    ## [43] rstudioapi_0.16.0       knitr_1.46              htmltools_0.5.8.1      
-    ## [46] rmarkdown_2.26          svglite_2.1.3           compiler_4.4.0
+    ##  [1] generics_0.1.3          xml2_1.3.6              stringi_1.8.4          
+    ##  [4] hms_1.1.3               digest_0.6.35           magrittr_2.0.3         
+    ##  [7] evaluate_0.23           grid_4.4.0              timechange_0.3.0       
+    ## [10] fastmap_1.2.0           jsonlite_1.8.9          rprojroot_2.0.4        
+    ## [13] zip_2.3.1               httr_1.4.7              UCSC.utils_1.0.0       
+    ## [16] viridisLite_0.4.2       scales_1.3.0            cli_3.6.3              
+    ## [19] crayon_1.5.2            rlang_1.1.5             munsell_0.5.1          
+    ## [22] withr_3.0.2             yaml_2.3.8              tools_4.4.0            
+    ## [25] tzdb_0.4.0              colorspace_2.1-0        GenomeInfoDbData_1.2.12
+    ## [28] vctrs_0.6.5             R6_2.5.1                lifecycle_1.0.4        
+    ## [31] zlibbioc_1.50.0         pkgconfig_2.0.3         pillar_1.10.1          
+    ## [34] gtable_0.3.5            Rcpp_1.0.12             glue_1.8.0             
+    ## [37] systemfonts_1.1.0       highr_0.10              xfun_0.44              
+    ## [40] tidyselect_1.2.1        rstudioapi_0.16.0       knitr_1.46             
+    ## [43] htmltools_0.5.8.1       rmarkdown_2.26          svglite_2.1.3          
+    ## [46] compiler_4.4.0
